@@ -46,8 +46,6 @@ function normalizeHeader(h: string): string {
 export async function parseOnboardingFile(file: File): Promise<ParseResult> {
   const ext = file.name.split(".").pop()?.toLowerCase();
   if (ext === "xlsx" || ext === "xls") {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore – xlsx is in package.json but types aren't installed in sandbox
     const XLSX = await import("xlsx");
     const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
     const firstSheet = wb.Sheets[wb.SheetNames[0]];
