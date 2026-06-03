@@ -39,9 +39,15 @@ service cloud.firestore {
 
     // ── users/{uid} ─────────────────────────────────────────────────────────
     match /users/{uid} {
-      // Users can read their own doc; admins can read/write any user doc
+      // Users can read their own doc; admins can read any user doc
       allow read: if isOwner(uid) || isAdmin();
-      allow write: if isAdmin();
+      // Self-signup: a user may CREATE only their OWN doc and only as a learner
+      // (prevents self-promotion to admin). Profile updates remain admin-only.
+      allow create: if isAdmin()
+        || (isOwner(uid)
+            && request.resource.data.uid == uid
+            && request.resource.data.role == "learner");
+      allow update, delete: if isAdmin();
     }
 
     // ── cohorts/{id} ────────────────────────────────────────────────────────

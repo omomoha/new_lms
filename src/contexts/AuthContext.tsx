@@ -27,9 +27,11 @@ import {
   User,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
+  createUserWithEmailAndPassword,
+  updateProfile,
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import auth from "@/lib/firebase/auth";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import getClientAuth from "@/lib/firebase/auth";
 import db from "@/lib/firebase/firestore";
 import type { AppUser } from "@/types";
 
@@ -38,6 +40,7 @@ interface AuthContextValue {
   appUser: AppUser | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -49,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const auth = getClientAuth();
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: User | null) => {
       setUser(firebaseUser);
 
@@ -104,16 +108,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    await signInWithEmailAndPassword(getClientAuth(), email, password);
     // onAuthStateChanged above will update state automatically
   };
 
+  // Self-service signup. Creates the Auth user AND the users/{uid} profile doc
+  // with role 'learner'. Admins are promoted out-of-band (bootstrap script /
+  // Cloud Function) — never self-assigned here.
+  const register = async (name: string, email: string, password: string) => {
+    const cred = await createUserWithEmailAndPassword(getClientAuth(), email, password);
+    await updateProfile(cred.user, { displayName: name });
+    await setDoc(doc(db, "users", cred.user.uid), {
+      uid: cred.user.uid,
+      email,
+      name,
+      role: "learner",
+      cohortIds: [],
+      status: "active",
+      createdAt: serverTimestamp(),
+    });
+    // onAuthStateChanged picks up the new doc and routes the user.
+  };
+
   const signOut = async () => {
-    await firebaseSignOut(auth);
+    await firebaseSignOut(getClientAuth());
   };
 
   return (
-    <AuthContext.Provider value={{ user, appUser, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, appUser, loading, signIn, register, signOut }}>
       {children}
     </AuthContext.Provider>
   );
