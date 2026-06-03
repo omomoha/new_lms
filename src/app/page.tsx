@@ -19,7 +19,7 @@ export default function HomePage() {
     if (!user) {
       router.replace("/auth/login");
     } else if (appUser?.role === "admin") {
-      router.replace("/admin/courses");
+      router.replace("/admin");
     } else {
       router.replace("/learn");
     }

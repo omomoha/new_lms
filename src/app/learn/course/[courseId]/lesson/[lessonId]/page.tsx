@@ -2,24 +2,27 @@
 
 /**
  * Lesson Player page.
- * Renders the correct lesson type (video, text, etc.) with a sidebar
- * showing the full module/lesson tree with completion state.
+ * Renders the correct lesson type (video, text, slides, doc, lab, quiz) with a
+ * sidebar showing the full module/lesson tree with completion state.
  */
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  doc, getDoc, collection, getDocs, query, orderBy
+  doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, where, serverTimestamp
 } from "firebase/firestore";
 import DOMPurify from "isomorphic-dompurify"; // Fix #6: sanitize text-lesson HTML
 import db from "@/lib/firebase/firestore";
+import { getResourceUrl, isPdf } from "@/lib/files";
+import { calcProgressPct } from "@/lib/progress";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Course, CourseModule, Lesson, LessonProgress, Enrollment } from "@/types";
+import type { Course, CourseModule, Lesson, LessonProgress, Enrollment, Assessment, Attempt } from "@/types";
 import LearnerShell from "@/components/layout/LearnerShell";
 import { VideoPlayer } from "@/components/video/VideoPlayer";
 import { Spinner } from "@/components/ui/Spinner";
 import { ProgressBar } from "@/components/ui/ProgressBar";
+import QuizForm from "@/components/quiz/QuizForm";
 
 export default function LessonPage() {
   const params = useParams();
@@ -35,13 +38,27 @@ export default function LessonPage() {
   const [progressMap, setProgressMap] = useState<Record<string, LessonProgress>>({});
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Document / slides viewer state
+  const [resourceUrl, setResourceUrl] = useState<string | null>(null);
+  const [resourceError, setResourceError] = useState<string | null>(null);
+  const [docCompleted, setDocCompleted] = useState(false);
+  const [markingComplete, setMarkingComplete] = useState(false);
+  const [markCompleteError, setMarkCompleteError] = useState<string | null>(null);
+
+  // Quiz lesson state
+  const [quizAssessment, setQuizAssessment] = useState<Assessment | null>(null);
+  const [quizAttempt, setQuizAttempt] = useState<Attempt | null>(null);
+  const [quizCompleted, setQuizCompleted] = useState(false);
 
   const allLessonIds = Object.values(lessonMap).flat().map((l) => l.id);
 
   const load = useCallback(async () => {
     if (!appUser) return;
     setLoading(true);
+    setLoadError(null);
     try {
       const courseSnap = await getDoc(doc(db, "courses", courseId));
       if (!courseSnap.exists()) { router.push("/learn"); return; }
@@ -80,6 +97,50 @@ export default function LessonPage() {
         })
       );
       setProgressMap(pMap);
+
+      // Quiz lesson: load assessment and latest attempt
+      if (foundLesson?.type === "quiz") {
+        const assessSnap = await getDocs(
+          query(
+            collection(db, "assessments"),
+            where("courseId", "==", courseId),
+            where("lessonId", "==", lessonId),
+            where("kind", "==", "quiz")
+          )
+        );
+        if (!assessSnap.empty) {
+          const a = { id: assessSnap.docs[0].id, ...assessSnap.docs[0].data() } as Assessment;
+          setQuizAssessment(a);
+
+          // Load latest attempt for this user + assessment
+          const attSnap = await getDocs(
+            query(
+              collection(db, "attempts"),
+              where("userId", "==", appUser.uid),
+              where("assessmentId", "==", a.id)
+            )
+          );
+          if (!attSnap.empty) {
+            // Sort by submittedAt descending to get latest
+            const sorted = attSnap.docs
+              .map((d) => ({ id: d.id, ...d.data() } as Attempt & { id: string }))
+              .sort((x, y) => {
+                const tx = x.submittedAt?.toMillis?.() ?? 0;
+                const ty = y.submittedAt?.toMillis?.() ?? 0;
+                return ty - tx;
+              });
+            setQuizAttempt(sorted[0]);
+          }
+        }
+        // Check if quiz lesson already completed via progress
+        const progSnap = await getDoc(doc(db, "progress", `${appUser.uid}_${lessonId}`));
+        if (progSnap.exists() && (progSnap.data() as LessonProgress).completedAt) {
+          setQuizCompleted(true);
+        }
+      }
+    } catch (err: unknown) {
+      console.error("LessonPage load failed:", err);
+      setLoadError(err instanceof Error ? err.message : "Failed to load lesson. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -87,17 +148,126 @@ export default function LessonPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Resolve resource URL for slides/doc/lab lesson types
+  useEffect(() => {
+    if (!lesson) return;
+    const needsResource = lesson.type === "slides" || lesson.type === "doc" || lesson.type === "lab";
+    if (!needsResource) return;
+
+    let cancelled = false;
+    setResourceUrl(null);
+    setResourceError(null);
+
+    (async () => {
+      try {
+        if (lesson.filePath) {
+          const url = await getResourceUrl(lesson.filePath);
+          if (!cancelled) setResourceUrl(url);
+        } else if (lesson.fileUrl) {
+          if (!cancelled) setResourceUrl(lesson.fileUrl);
+        }
+        if (appUser) {
+          const snap = await getDoc(doc(db, "progress", `${appUser.uid}_${lesson.id}`));
+          if (!cancelled && snap.exists()) {
+            const p = snap.data() as LessonProgress;
+            if (p.completedAt) setDocCompleted(true);
+          }
+        }
+      } catch (err: unknown) {
+        if (!cancelled) setResourceError("Unable to load resource. Check your connection.");
+        console.error(err);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [lesson, appUser]);
+
   // Navigate to next lesson after completion
-  const handleLessonComplete = () => {
+  const handleLessonComplete = useCallback(() => {
     const flat = Object.values(lessonMap).flat();
     const idx = flat.findIndex((l) => l.id === lessonId);
     const next = flat[idx + 1];
     if (next) router.push(`/learn/course/${courseId}/lesson/${next.id}`);
-  };
+  }, [lessonMap, lessonId, courseId, router]);
+
+  // Mark a non-video lesson as complete (slides, doc, text, lab, quiz)
+  const handleMarkNonVideoComplete = useCallback(async () => {
+    if (!appUser || !lesson || docCompleted || markingComplete) return;
+    setMarkingComplete(true);
+    setMarkCompleteError(null);
+    try {
+      const progressDocId = `${appUser.uid}_${lesson.id}`;
+      const enrollmentId = `${appUser.uid}_${courseId}`;
+
+      await setDoc(doc(db, "progress", progressDocId), {
+        userId: appUser.uid,
+        lessonId: lesson.id,
+        courseId,
+        watchedPct: 100,
+        positionSec: 0,
+        completedAt: serverTimestamp(),
+      });
+
+      const completedIds = await Promise.all(
+        allLessonIds.map(async (lid) => {
+          const snap = await getDoc(doc(db, "progress", `${appUser.uid}_${lid}`));
+          if (!snap.exists()) return null;
+          const p = snap.data() as LessonProgress;
+          return p.completedAt ? lid : null;
+        })
+      ).then((results) => results.filter((id): id is string => id !== null));
+
+      const pct = calcProgressPct([...completedIds, lesson.id], allLessonIds);
+      const enrollSnap = await getDoc(doc(db, "enrollments", enrollmentId));
+      if (enrollSnap.exists()) {
+        await updateDoc(doc(db, "enrollments", enrollmentId), {
+          progressPct: pct,
+          lastLessonId: lesson.id,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        await setDoc(doc(db, "enrollments", enrollmentId), {
+          userId: appUser.uid,
+          courseId,
+          cohortId: appUser.cohortIds?.[0] ?? "",
+          progressPct: pct,
+          lastLessonId: lesson.id,
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      setDocCompleted(true);
+      handleLessonComplete();
+    } catch (err: unknown) {
+      console.error("handleMarkNonVideoComplete failed:", err);
+      setMarkCompleteError("Could not mark lesson complete. Please try again.");
+    } finally {
+      setMarkingComplete(false);
+    }
+  }, [appUser, lesson, courseId, docCompleted, markingComplete, allLessonIds, handleLessonComplete]);
+
+  // Called by QuizForm when learner passes the quiz
+  const handleQuizPassed = useCallback(() => {
+    setQuizCompleted(true);
+    handleMarkNonVideoComplete();
+  }, [handleMarkNonVideoComplete]);
 
   if (loading) return (
     <LearnerShell>
       <div className="flex justify-center py-20"><Spinner /></div>
+    </LearnerShell>
+  );
+
+  if (loadError) return (
+    <LearnerShell>
+      <div className="max-w-2xl mx-auto px-4 py-10">
+        <div
+          className="rounded-lg p-4 text-sm"
+          style={{ backgroundColor: "#FEE2E2", color: "#991B1B" }}
+        >
+          {loadError}
+        </div>
+      </div>
     </LearnerShell>
   );
 
@@ -202,7 +372,7 @@ export default function LessonPage() {
         <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-6" style={{ backgroundColor: "#F5F7F4" }}>
           <h1 className="font-serif-brand text-xl font-normal mb-4" style={{ color: "#13403A" }}>{lesson.title}</h1>
 
-          {/* Fix #5: only render VideoPlayer once allLessonIds is populated */}
+          {/* ── Video lesson ─────────────────────────────────────────────── */}
           {lesson.type === "video" && lesson.videoPath && appUser ? (
             allLessonIds.length > 0 && (
               <VideoPlayer
@@ -214,34 +384,151 @@ export default function LessonPage() {
                 onComplete={handleLessonComplete}
               />
             )
-          ) : lesson.type === "text" && lesson.textContent ? (
-            // Fix #6: sanitize HTML before rendering to prevent XSS
-            <div
-              className="prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{
-                __html: DOMPurify.sanitize(lesson.textContent),
-              }}
-            />
           ) : lesson.type === "video" && !lesson.videoPath ? (
             <div className="w-full aspect-video rounded-xl flex items-center justify-center" style={{ backgroundColor: "#E7F1DE", color: "#5E6E69" }}>
               Video not yet uploaded.
             </div>
-          ) : (
-            <div className="card text-center py-12" style={{ color: "#5E6E69" }}>
-              <div className="mx-auto w-8 h-8 rounded-sm rotate-45 mb-4" style={{ backgroundColor: "#8FB85C" }} />
-              <p className="text-sm">
-                {lesson.fileUrl ? (
-                  <a href={lesson.fileUrl} target="_blank" rel="noopener noreferrer" className="hover:underline font-medium" style={{ color: "#2C7A6B" }}>
-                    Open {lesson.type} resource →
-                  </a>
+
+          ) : /* ── Text lesson ──────────────────────────────────────────────── */
+          lesson.type === "text" && lesson.textContent ? (
+            <>
+              <div
+                className="prose prose-sm max-w-none mb-6"
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(lesson.textContent),
+                }}
+              />
+              <NonVideoCompleteButton
+                completed={docCompleted}
+                loading={markingComplete}
+                error={markCompleteError}
+                onMark={handleMarkNonVideoComplete}
+              />
+            </>
+
+          ) : /* ── Quiz lesson ──────────────────────────────────────────────── */
+          lesson.type === "quiz" ? (
+            <div className="max-w-2xl space-y-4">
+              {quizAssessment ? (
+                <>
+                  {quizCompleted && (
+                    <div className="inline-flex items-center gap-1.5 text-sm font-medium mb-2" style={{ color: "#8FB85C" }}>
+                      <span>✓</span> Quiz completed
+                    </div>
+                  )}
+                  <QuizForm
+                    assessment={quizAssessment}
+                    existingAttempt={quizAttempt}
+                    onPassed={handleQuizPassed}
+                  />
+                </>
+              ) : (
+                <div className="card text-center py-12" style={{ color: "#5E6E69" }}>
+                  <p className="text-sm">This quiz has not been set up yet. Please check back later.</p>
+                </div>
+              )}
+            </div>
+
+          ) : /* ── Slides / Doc / Lab with resource file ───────────────────── */
+          (lesson.type === "slides" || lesson.type === "doc" || lesson.type === "lab") ? (
+            <div className="space-y-4">
+              {resourceUrl && (
+                <a
+                  href={resourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 btn-secondary text-sm"
+                >
+                  ↗ Open / download file
+                </a>
+              )}
+
+              {resourceError ? (
+                <div className="card py-10 text-center text-sm" style={{ color: "#5E6E69" }}>
+                  {resourceError}
+                </div>
+              ) : !resourceUrl ? (
+                lesson.filePath || lesson.fileUrl ? (
+                  <div className="w-full rounded-xl flex items-center justify-center" style={{ height: "70vh", backgroundColor: "#E7F1DE" }}>
+                    <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#8FB85C" }} />
+                  </div>
                 ) : (
-                  `Content type "${lesson.type}" — file not yet attached.`
-                )}
+                  <div className="card text-center py-12" style={{ color: "#5E6E69" }}>
+                    <p className="text-sm">File not yet uploaded for this lesson.</p>
+                  </div>
+                )
+              ) : isPdf(lesson.filePath ?? lesson.fileUrl ?? "") ? (
+                <iframe
+                  src={resourceUrl}
+                  title={lesson.title}
+                  className="w-full rounded-xl border"
+                  style={{ height: "70vh", borderColor: "#DDE6DF" }}
+                />
+              ) : (
+                <>
+                  <iframe
+                    src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(resourceUrl)}`}
+                    title={lesson.title}
+                    className="w-full rounded-xl border"
+                    style={{ height: "70vh", borderColor: "#DDE6DF" }}
+                    allowFullScreen
+                  />
+                  <p className="text-xs mt-1" style={{ color: "#9EB3AD" }}>
+                    Preview rendered via Microsoft Office Online.
+                  </p>
+                </>
+              )}
+
+              <NonVideoCompleteButton
+                completed={docCompleted}
+                loading={markingComplete}
+                error={markCompleteError}
+                onMark={handleMarkNonVideoComplete}
+              />
+            </div>
+
+          ) : (
+            /* ── Unknown / unimplemented type ─────────────────────────────── */
+            <div className="card text-center py-12" style={{ color: "#5E6E69" }}>
+              <p className="text-sm">
+                {`Content type "${lesson.type}" is not yet supported.`}
               </p>
             </div>
           )}
         </main>
       </div>
     </LearnerShell>
+  );
+}
+
+// ── Mark-complete button for non-video lessons ──────────────────────────────
+
+interface NonVideoCompleteButtonProps {
+  completed: boolean;
+  loading: boolean;
+  error: string | null;
+  onMark: () => void;
+}
+
+function NonVideoCompleteButton({ completed, loading, error, onMark }: NonVideoCompleteButtonProps) {
+  if (completed) {
+    return (
+      <div className="inline-flex items-center gap-1.5 text-sm font-medium" style={{ color: "#8FB85C" }}>
+        <span>✓</span> Completed
+      </div>
+    );
+  }
+  return (
+    <div>
+      <button
+        onClick={onMark}
+        disabled={loading}
+        className="btn-primary text-sm"
+        style={{ opacity: loading ? 0.7 : 1 }}
+      >
+        {loading ? "Saving…" : "Mark as Complete ✓"}
+      </button>
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+    </div>
   );
 }

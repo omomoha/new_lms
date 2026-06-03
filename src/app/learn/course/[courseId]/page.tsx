@@ -4,14 +4,15 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  doc, getDoc, collection, getDocs, query, orderBy
+  doc, getDoc, collection, getDocs, query, orderBy, where
 } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Course, CourseModule, Lesson, Enrollment, LessonProgress } from "@/types";
+import type { Course, CourseModule, Lesson, Enrollment, LessonProgress, Assessment, Attempt } from "@/types";
 import LearnerShell from "@/components/layout/LearnerShell";
 import { Spinner } from "@/components/ui/Spinner";
 import { ProgressBar } from "@/components/ui/ProgressBar";
+import QuizForm from "@/components/quiz/QuizForm";
 
 export default function CoursePage() {
   const params = useParams();
@@ -25,11 +26,21 @@ export default function CoursePage() {
   const [progressMap, setProgressMap] = useState<Record<string, LessonProgress>>({});
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Pre/Post assessment state
+  const [preAssessment, setPreAssessment] = useState<Assessment | null>(null);
+  const [postAssessment, setPostAssessment] = useState<Assessment | null>(null);
+  const [preAttempt, setPreAttempt] = useState<Attempt | null>(null);
+  const [postAttempt, setPostAttempt] = useState<Attempt | null>(null);
+  // Which assessment panel is expanded
+  const [showingAssessment, setShowingAssessment] = useState<"pre" | "post" | null>(null);
 
   useEffect(() => {
     if (!appUser) return;
     (async () => {
       setLoading(true);
+      setLoadError(null);
       try {
         const courseSnap = await getDoc(doc(db, "courses", courseId));
         if (!courseSnap.exists()) { router.push("/learn"); return; }
@@ -54,8 +65,7 @@ export default function CoursePage() {
         const enrollSnap = await getDoc(doc(db, "enrollments", `${appUser.uid}_${courseId}`));
         if (enrollSnap.exists()) setEnrollment(enrollSnap.data() as Enrollment);
 
-        // Fetch all lesson progress docs for this user/course
-        // (In production, query progress where userId==appUser.uid && courseId==courseId)
+        // Fetch all lesson progress
         const allLessons = Object.values(lMap).flat();
         const pMap: Record<string, LessonProgress> = {};
         await Promise.all(
@@ -65,6 +75,71 @@ export default function CoursePage() {
           })
         );
         setProgressMap(pMap);
+
+        // Load pre/post assessments for this course
+        const preSnap = await getDocs(
+          query(
+            collection(db, "assessments"),
+            where("courseId", "==", courseId),
+            where("kind", "==", "pre")
+          )
+        );
+        if (!preSnap.empty) {
+          const pre = { id: preSnap.docs[0].id, ...preSnap.docs[0].data() } as Assessment;
+          setPreAssessment(pre);
+
+          // Check for existing attempt
+          const preAttSnap = await getDocs(
+            query(
+              collection(db, "attempts"),
+              where("userId", "==", appUser.uid),
+              where("assessmentId", "==", pre.id)
+            )
+          );
+          if (!preAttSnap.empty) {
+            const sorted = preAttSnap.docs
+              .map((d) => ({ id: d.id, ...d.data() } as Attempt & { id: string }))
+              .sort((a, b) => {
+                const ta = a.submittedAt?.toMillis?.() ?? 0;
+                const tb = b.submittedAt?.toMillis?.() ?? 0;
+                return tb - ta;
+              });
+            setPreAttempt(sorted[0]);
+          }
+        }
+
+        const postSnap = await getDocs(
+          query(
+            collection(db, "assessments"),
+            where("courseId", "==", courseId),
+            where("kind", "==", "post")
+          )
+        );
+        if (!postSnap.empty) {
+          const post = { id: postSnap.docs[0].id, ...postSnap.docs[0].data() } as Assessment;
+          setPostAssessment(post);
+
+          const postAttSnap = await getDocs(
+            query(
+              collection(db, "attempts"),
+              where("userId", "==", appUser.uid),
+              where("assessmentId", "==", post.id)
+            )
+          );
+          if (!postAttSnap.empty) {
+            const sorted = postAttSnap.docs
+              .map((d) => ({ id: d.id, ...d.data() } as Attempt & { id: string }))
+              .sort((a, b) => {
+                const ta = a.submittedAt?.toMillis?.() ?? 0;
+                const tb = b.submittedAt?.toMillis?.() ?? 0;
+                return tb - ta;
+              });
+            setPostAttempt(sorted[0]);
+          }
+        }
+      } catch (err: unknown) {
+        console.error("CoursePage load failed:", err);
+        setLoadError(err instanceof Error ? err.message : "Failed to load course. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -77,9 +152,24 @@ export default function CoursePage() {
     </LearnerShell>
   );
 
+  if (loadError) return (
+    <LearnerShell>
+      <div className="max-w-2xl mx-auto px-4 py-10">
+        <div
+          className="rounded-lg p-4 text-sm"
+          style={{ backgroundColor: "#FEE2E2", color: "#991B1B" }}
+        >
+          {loadError}
+        </div>
+      </div>
+    </LearnerShell>
+  );
+
   if (!course) return null;
 
   const firstLesson = Object.values(lessonMap).flat()[0];
+  const progressPct = enrollment?.progressPct ?? 0;
+  const courseComplete = progressPct >= 100;
 
   return (
     <LearnerShell>
@@ -104,6 +194,74 @@ export default function CoursePage() {
           )}
         </div>
 
+        {/* Pre-assessment banner: show if exists and learner has no attempt yet */}
+        {preAssessment && !preAttempt && (
+          <div className="card mb-4" style={{ borderLeft: "4px solid #8FB85C" }}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="kicker text-xs" style={{ color: "#2C7A6B" }}>PRE-COURSE ASSESSMENT</span>
+                <h3 className="font-semibold text-sm mt-0.5" style={{ color: "#13403A" }}>
+                  {preAssessment.title}
+                </h3>
+                <p className="text-xs mt-1" style={{ color: "#5E6E69" }}>
+                  {preAssessment.questions.length} question{preAssessment.questions.length !== 1 ? "s" : ""} · pass mark: {preAssessment.passMark}%
+                </p>
+              </div>
+              <button
+                onClick={() => setShowingAssessment(showingAssessment === "pre" ? null : "pre")}
+                className="btn-primary text-xs flex-shrink-0"
+              >
+                {showingAssessment === "pre" ? "Close" : "Take Assessment"}
+              </button>
+            </div>
+            {showingAssessment === "pre" && (
+              <div className="mt-4 pt-4 border-t" style={{ borderColor: "#DDE6DF" }}>
+                <QuizForm
+                  assessment={preAssessment}
+                  onPassed={() => {
+                    setShowingAssessment(null);
+                    // Re-trigger effect to refresh attempt state
+                    router.refresh();
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Pre-assessment score when already attempted */}
+        {preAssessment && preAttempt && (
+          <div className="card mb-4" style={{ borderLeft: "4px solid #8FB85C" }}>
+            <span className="kicker text-xs" style={{ color: "#2C7A6B" }}>PRE-COURSE ASSESSMENT</span>
+            <div className="flex items-center justify-between mt-1">
+              <div>
+                <p className="text-sm font-medium" style={{ color: "#13403A" }}>{preAssessment.title}</p>
+                <p className="text-xs mt-0.5" style={{ color: "#5E6E69" }}>
+                  Score: {preAttempt.score}/{preAttempt.total} ({preAttempt.total > 0 ? Math.round((preAttempt.score / preAttempt.total) * 100) : 0}%)
+                  {" · "}
+                  <span style={{ color: preAttempt.passed ? "#2C7A6B" : "#B91C1C" }}>
+                    {preAttempt.passed ? "Passed" : "Not passed"}
+                  </span>
+                </p>
+              </div>
+              <button
+                onClick={() => setShowingAssessment(showingAssessment === "pre" ? null : "pre")}
+                className="btn-secondary text-xs"
+              >
+                {showingAssessment === "pre" ? "Close" : "Retake"}
+              </button>
+            </div>
+            {showingAssessment === "pre" && (
+              <div className="mt-4 pt-4 border-t" style={{ borderColor: "#DDE6DF" }}>
+                <QuizForm
+                  assessment={preAssessment}
+                  onPassed={() => setShowingAssessment(null)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Start / Continue button */}
         {firstLesson && (
           <Link
@@ -112,6 +270,73 @@ export default function CoursePage() {
           >
             {enrollment?.lastLessonId ? "Continue Learning" : "Start Course"}
           </Link>
+        )}
+
+        {/* Post-assessment banner: show when course is 100% complete */}
+        {postAssessment && courseComplete && !postAttempt && (
+          <div className="card mb-4" style={{ borderLeft: "4px solid #13403A" }}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="kicker text-xs" style={{ color: "#13403A" }}>POST-COURSE ASSESSMENT</span>
+                <h3 className="font-semibold text-sm mt-0.5" style={{ color: "#13403A" }}>
+                  {postAssessment.title}
+                </h3>
+                <p className="text-xs mt-1" style={{ color: "#5E6E69" }}>
+                  You have completed the course — take the final assessment.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowingAssessment(showingAssessment === "post" ? null : "post")}
+                className="btn-primary text-xs flex-shrink-0"
+              >
+                {showingAssessment === "post" ? "Close" : "Take Assessment"}
+              </button>
+            </div>
+            {showingAssessment === "post" && (
+              <div className="mt-4 pt-4 border-t" style={{ borderColor: "#DDE6DF" }}>
+                <QuizForm
+                  assessment={postAssessment}
+                  onPassed={() => {
+                    setShowingAssessment(null);
+                    router.refresh();
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Post-assessment score when already attempted */}
+        {postAssessment && postAttempt && (
+          <div className="card mb-4" style={{ borderLeft: "4px solid #13403A" }}>
+            <span className="kicker text-xs" style={{ color: "#13403A" }}>POST-COURSE ASSESSMENT</span>
+            <div className="flex items-center justify-between mt-1">
+              <div>
+                <p className="text-sm font-medium" style={{ color: "#13403A" }}>{postAssessment.title}</p>
+                <p className="text-xs mt-0.5" style={{ color: "#5E6E69" }}>
+                  Score: {postAttempt.score}/{postAttempt.total} ({postAttempt.total > 0 ? Math.round((postAttempt.score / postAttempt.total) * 100) : 0}%)
+                  {" · "}
+                  <span style={{ color: postAttempt.passed ? "#2C7A6B" : "#B91C1C" }}>
+                    {postAttempt.passed ? "Passed" : "Not passed"}
+                  </span>
+                </p>
+              </div>
+              <button
+                onClick={() => setShowingAssessment(showingAssessment === "post" ? null : "post")}
+                className="btn-secondary text-xs"
+              >
+                {showingAssessment === "post" ? "Close" : "Retake"}
+              </button>
+            </div>
+            {showingAssessment === "post" && (
+              <div className="mt-4 pt-4 border-t" style={{ borderColor: "#DDE6DF" }}>
+                <QuizForm
+                  assessment={postAssessment}
+                  onPassed={() => setShowingAssessment(null)}
+                />
+              </div>
+            )}
+          </div>
         )}
 
         {/* Module / Lesson tree */}

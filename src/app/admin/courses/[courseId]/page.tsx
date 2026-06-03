@@ -2,7 +2,8 @@
 
 /**
  * Course Builder — Admin
- * Lets admins add/reorder modules and lessons, and upload video for video lessons.
+ * Lets admins add/reorder modules and lessons, upload video for video lessons,
+ * define quiz lessons with inline question editor, and configure pre/post assessments.
  */
 
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -19,13 +20,16 @@ import {
   orderBy,
   arrayUnion,
   arrayRemove,
+  where,
 } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
 import { videoService } from "@/lib/video";
-import type { Course, CourseModule, Lesson, LessonType, Cohort } from "@/types";
+import { uploadResource, ACCEPT_BY_TYPE } from "@/lib/files";
+import type { Course, CourseModule, Lesson, LessonType, Cohort, Assessment, AssessmentKind } from "@/types";
 import AdminShell from "@/components/layout/AdminShell";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
+import QuizEditor from "@/components/quiz/QuizEditor";
 
 const LESSON_TYPES: LessonType[] = ["video", "text", "slides", "doc", "lab", "quiz"];
 
@@ -50,10 +54,23 @@ export default function CourseBuilderPage() {
   const [lessonType, setLessonType] = useState<LessonType>("video");
   const [lessonText, setLessonText] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [resourceFile, setResourceFile] = useState<File | null>(null);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const resourceFileRef = useRef<HTMLInputElement>(null);
+
+  // Quiz editor: shown after a quiz lesson is created (or for editing)
+  // key = lessonId, value = assessment or null if not yet created
+  const [quizAssessments, setQuizAssessments] = useState<Record<string, Assessment | null>>({});
+  // Which quiz lesson is currently showing its editor inline
+  const [editingQuizLessonId, setEditingQuizLessonId] = useState<string | null>(null);
+
+  // Pre/post assessments
+  const [preAssessment, setPreAssessment] = useState<Assessment | null | undefined>(undefined);
+  const [postAssessment, setPostAssessment] = useState<Assessment | null | undefined>(undefined);
+  const [editingPrePost, setEditingPrePost] = useState<AssessmentKind | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,6 +97,33 @@ export default function CourseBuilderPage() {
         lMap[mod.id] = lSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Lesson));
       }
       setLessonMap(lMap);
+
+      // Load quiz assessments for quiz-type lessons
+      const allLessons = Object.values(lMap).flat().filter((l) => l.type === "quiz");
+      const qMap: Record<string, Assessment | null> = {};
+      await Promise.all(allLessons.map(async (l) => {
+        const snap = await getDocs(
+          query(
+            collection(db, "assessments"),
+            where("courseId", "==", courseId),
+            where("lessonId", "==", l.id),
+            where("kind", "==", "quiz")
+          )
+        );
+        qMap[l.id] = snap.empty ? null : ({ id: snap.docs[0].id, ...snap.docs[0].data() } as Assessment);
+      }));
+      setQuizAssessments(qMap);
+
+      // Load pre/post assessments
+      const preSnap = await getDocs(
+        query(collection(db, "assessments"), where("courseId", "==", courseId), where("kind", "==", "pre"))
+      );
+      setPreAssessment(preSnap.empty ? null : ({ id: preSnap.docs[0].id, ...preSnap.docs[0].data() } as Assessment));
+
+      const postSnap = await getDocs(
+        query(collection(db, "assessments"), where("courseId", "==", courseId), where("kind", "==", "post"))
+      );
+      setPostAssessment(postSnap.empty ? null : ({ id: postSnap.docs[0].id, ...postSnap.docs[0].data() } as Assessment));
     } finally {
       setLoading(false);
     }
@@ -99,7 +143,6 @@ export default function CourseBuilderPage() {
         lessonOrder: [],
       });
       await updateDoc(doc(db, "courses", courseId, "modules", ref.id), { id: ref.id });
-      // Update course moduleOrder
       const newOrder = [...(course?.moduleOrder ?? []), ref.id];
       await updateDoc(doc(db, "courses", courseId), { moduleOrder: newOrder });
       setModuleTitle(""); setAddingModule(false);
@@ -128,11 +171,21 @@ export default function CourseBuilderPage() {
         setUploadPct(null);
       }
 
+      let filePath: string | undefined;
+      if ((lessonType === "slides" || lessonType === "doc" || lessonType === "lab") && resourceFile) {
+        const path = `resources/${courseId}/${moduleId}/${Date.now()}_${resourceFile.name}`;
+        filePath = await uploadResource(resourceFile, path, (p) =>
+          setUploadPct(p.pct)
+        );
+        setUploadPct(null);
+      }
+
       const lessonData: Omit<Lesson, "id"> = {
         title: lessonTitle.trim(),
         type: lessonType,
         order,
         ...(videoPath ? { videoPath } : {}),
+        ...(filePath ? { filePath } : {}),
         ...(lessonType === "text" ? { textContent: lessonText } : {}),
       };
 
@@ -144,14 +197,22 @@ export default function CourseBuilderPage() {
         doc(db, "courses", courseId, "modules", moduleId, "lessons", ref.id),
         { id: ref.id }
       );
-      // Update module lessonOrder
       const newLOrder = [...existingLessons.map((l) => l.id), ref.id];
       await updateDoc(doc(db, "courses", courseId, "modules", moduleId), {
         lessonOrder: newLOrder,
       });
 
-      setLessonTitle(""); setLessonText(""); setVideoFile(null);
+      const createdLessonId = ref.id;
+      setLessonTitle(""); setLessonText(""); setVideoFile(null); setResourceFile(null);
       setAddingLessonTo(null);
+
+      // If quiz type, automatically open the quiz editor for the new lesson
+      if (lessonType === "quiz") {
+        setQuizAssessments((prev) => ({ ...prev, [createdLessonId]: null }));
+        setEditingQuizLessonId(createdLessonId);
+        // Need to reload so the lesson appears in lessonMap before editor shows
+      }
+
       load();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to add lesson");
@@ -167,8 +228,6 @@ export default function CourseBuilderPage() {
     setCourse({ ...course, status: next });
   };
 
-  // Grant/revoke a cohort's access to this course. Kept symmetric on both
-  // sides (course.assignedCohortIds + cohort.courseIds) for reporting.
   const toggleCohortAccess = async (cohortId: string) => {
     if (!course) return;
     const has = (course.assignedCohortIds ?? []).includes(cohortId);
@@ -271,6 +330,64 @@ export default function CourseBuilderPage() {
         )}
       </div>
 
+      {/* Pre / Post assessments */}
+      <div className="card mb-4">
+        <h2 className="font-medium mb-1" style={{ color: "#1E302C" }}>Pre / Post Assessments</h2>
+        <p className="text-xs mb-4" style={{ color: "#5E6E69" }}>
+          Pre-assessment shown before learners start the course; post-assessment after 100% completion.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {(["pre", "post"] as AssessmentKind[]).map((kind) => {
+            const existing = kind === "pre" ? preAssessment : postAssessment;
+            const isEditing = editingPrePost === kind;
+            return (
+              <div key={kind} className="rounded-lg p-3 border" style={{ borderColor: "#DDE6DF", backgroundColor: "#F5F7F4" }}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold uppercase" style={{ color: "#2C7A6B" }}>
+                    {kind === "pre" ? "Pre-course" : "Post-course"}
+                  </span>
+                  {existing && !isEditing && (
+                    <button
+                      onClick={() => setEditingPrePost(kind)}
+                      className="text-xs btn-secondary px-2 py-1"
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
+                {isEditing ? (
+                  <QuizEditor
+                    courseId={courseId}
+                    kind={kind}
+                    existing={existing ?? undefined}
+                    onSaved={(a) => {
+                      if (kind === "pre") setPreAssessment(a);
+                      else setPostAssessment(a);
+                      setEditingPrePost(null);
+                    }}
+                    onCancel={() => setEditingPrePost(null)}
+                  />
+                ) : existing ? (
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: "#1E302C" }}>{existing.title}</p>
+                    <p className="text-xs mt-0.5" style={{ color: "#5E6E69" }}>
+                      {existing.questions.length} question{existing.questions.length !== 1 ? "s" : ""} · pass: {existing.passMark}%
+                    </p>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setEditingPrePost(kind)}
+                    className="btn-primary text-xs w-full"
+                  >
+                    + Create {kind === "pre" ? "Pre" : "Post"}-Assessment
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Modules */}
       <div className="space-y-4">
         {modules.map((mod) => (
@@ -290,15 +407,44 @@ export default function CourseBuilderPage() {
               {(lessonMap[mod.id] ?? []).length > 0 ? (
                 <ul className="space-y-1.5 mb-3">
                   {(lessonMap[mod.id] ?? []).map((lesson) => (
-                    <li
-                      key={lesson.id}
-                      className="flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg"
-                      style={{ backgroundColor: "#E7F1DE", color: "#1E302C" }}
-                    >
-                      <span className="text-xs font-semibold uppercase" style={{ color: "#2C7A6B" }}>
-                        {lesson.type}
-                      </span>
-                      <span>{lesson.title}</span>
+                    <li key={lesson.id}>
+                      <div
+                        className="flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg"
+                        style={{ backgroundColor: "#E7F1DE", color: "#1E302C" }}
+                      >
+                        <span className="text-xs font-semibold uppercase" style={{ color: "#2C7A6B" }}>
+                          {lesson.type}
+                        </span>
+                        <span className="flex-1">{lesson.title}</span>
+                        {lesson.type === "quiz" && (
+                          <button
+                            onClick={() => setEditingQuizLessonId(
+                              editingQuizLessonId === lesson.id ? null : lesson.id
+                            )}
+                            className="text-xs btn-secondary px-2 py-0.5"
+                          >
+                            {quizAssessments[lesson.id]
+                              ? (editingQuizLessonId === lesson.id ? "Close" : "Edit Quiz")
+                              : "Set Up Quiz"}
+                          </button>
+                        )}
+                      </div>
+                      {/* Inline quiz editor for this lesson */}
+                      {lesson.type === "quiz" && editingQuizLessonId === lesson.id && (
+                        <div className="mt-2 pl-4 border-l-2" style={{ borderColor: "#8FB85C" }}>
+                          <QuizEditor
+                            courseId={courseId}
+                            kind="quiz"
+                            lessonId={lesson.id}
+                            existing={quizAssessments[lesson.id] ?? undefined}
+                            onSaved={(a) => {
+                              setQuizAssessments((prev) => ({ ...prev, [lesson.id]: a }));
+                              setEditingQuizLessonId(null);
+                            }}
+                            onCancel={() => setEditingQuizLessonId(null)}
+                          />
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -360,6 +506,36 @@ export default function CourseBuilderPage() {
                     </div>
                   )}
 
+                  {(lessonType === "slides" || lessonType === "doc" || lessonType === "lab") && (
+                    <div>
+                      <input
+                        ref={resourceFileRef}
+                        type="file"
+                        accept={ACCEPT_BY_TYPE[lessonType]}
+                        className="hidden"
+                        onChange={(e) => setResourceFile(e.target.files?.[0] ?? null)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => resourceFileRef.current?.click()}
+                        className="btn-secondary text-xs"
+                      >
+                        {resourceFile ? resourceFile.name : `Choose ${lessonType === "slides" ? "presentation (PPTX/PPT/PDF)" : lessonType === "doc" ? "document (DOCX/DOC/PDF)" : "lab file (PDF/DOCX/DOC)"}`}
+                      </button>
+                      {uploadPct !== null && (
+                        <div className="mt-2">
+                          <div className="w-full rounded-full h-1.5" style={{ backgroundColor: "#DDE6DF" }}>
+                            <div
+                              className="h-1.5 rounded-full transition-all"
+                              style={{ width: `${uploadPct}%`, backgroundColor: "#8FB85C" }}
+                            />
+                          </div>
+                          <p className="text-xs mt-1" style={{ color: "#5E6E69" }}>{uploadPct}%</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {lessonType === "text" && (
                     <textarea
                       className="input-field resize-none"
@@ -368,6 +544,12 @@ export default function CourseBuilderPage() {
                       value={lessonText}
                       onChange={(e) => setLessonText(e.target.value)}
                     />
+                  )}
+
+                  {lessonType === "quiz" && (
+                    <p className="text-xs" style={{ color: "#5E6E69" }}>
+                      After adding the lesson, use the &quot;Set Up Quiz&quot; button to define questions.
+                    </p>
                   )}
 
                   <div className="flex gap-2">

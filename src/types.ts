@@ -66,7 +66,8 @@ export interface Lesson {
   order: number;
   videoPath?: string;      // Firebase Storage path (not URL) — use VideoService.getPlaybackUrl()
   textContent?: string;    // HTML or Markdown for text lessons
-  fileUrl?: string;        // For slides/doc/lab: public download URL
+  fileUrl?: string;        // For slides/doc/lab: public download URL (legacy — prefer filePath)
+  filePath?: string;       // Firebase Storage path for slides/doc/lab resources — use FileService.getResourceUrl()
 }
 
 // ─── Enrollment ──────────────────────────────────────────────────────────────
@@ -120,4 +121,54 @@ export interface MailDoc {
     html: string;
     text: string;
   };
+}
+
+// ─── Assessments ─────────────────────────────────────────────────────────────
+
+export type AssessmentKind = "pre" | "post" | "quiz";
+
+export interface AssessmentQuestion {
+  id: string;
+  prompt: string;
+  type: "mcq" | "tf";
+  options: string[];           // 2–6 strings; for "tf" typically ["True", "False"]
+}
+
+/**
+ * assessments/{id}
+ * Readable by authenticated learners (questions only — NO correct answers).
+ */
+export interface Assessment {
+  id: string;
+  courseId: string;
+  kind: AssessmentKind;
+  lessonId?: string;           // set when kind === "quiz"; unset for pre/post
+  title: string;
+  passMark: number;            // 0–100 percent required to pass
+  questions: AssessmentQuestion[];
+}
+
+/**
+ * assessmentKeys/{assessmentId}
+ * Admin/function access ONLY — rules deny all client reads.
+ * Stored separately so answers are never reachable by learners.
+ */
+export interface AssessmentKey {
+  answers: Record<string, number>; // { [questionId]: correctOptionIndex }
+}
+
+/**
+ * attempts/{uid_assessmentId_ts}
+ * Written ONLY by the gradeAttempt Cloud Function via admin SDK.
+ * Learners may read their own; admins read all.
+ */
+export interface Attempt {
+  userId: string;
+  assessmentId: string;
+  courseId: string;
+  kind: AssessmentKind;
+  score: number;               // number of correct answers
+  total: number;               // total number of questions
+  passed: boolean;
+  submittedAt: Timestamp;
 }

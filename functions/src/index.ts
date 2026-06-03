@@ -4,3 +4,5 @@
  */
 
 export { bulkOnboard } from "./bulkOnboard";
+export { gradeAttempt } from "./gradeAttempt";
+export { weeklyDigest } from "./weeklyDigest";
