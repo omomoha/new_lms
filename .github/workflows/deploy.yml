@@ -59,7 +59,9 @@ jobs:
       # runs the suite, and tears it down. The demo- project prefix keeps the
       # emulator fully offline (no credentials touched).
       - name: Firestore security-rules tests (emulator)
-        run: npx firebase-tools@13 emulators:exec --only firestore --project demo-andela-lms "npm run test:rules"
+        run: |
+          npx firebase-tools@13 experiments:enable webframeworks
+          npx firebase-tools@13 emulators:exec --only firestore --project demo-andela-lms "npm run test:rules"
 
   # ── Build + deploy everything (main only) ───────────────────────────────────
   deploy:
