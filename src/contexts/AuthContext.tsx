@@ -23,7 +23,7 @@ import React, {
   ReactNode,
 } from "react";
 import {
-  onAuthStateChanged,
+  onIdTokenChanged,
   User,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
@@ -46,6 +46,22 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// The Edge middleware (src/middleware.ts) gates /admin/* and /learn/* on the
+// presence of a "__session" cookie. Firebase's web SDK does NOT set cookies
+// by itself, so we mirror the ID token into one here. We listen with
+// onIdTokenChanged (not onAuthStateChanged) so the cookie is also refreshed
+// on the hourly token rotation and cleared on sign-out.
+async function setSessionCookie(firebaseUser: User | null) {
+  if (typeof document === "undefined") return;
+  if (firebaseUser) {
+    const token = await firebaseUser.getIdToken();
+    const secure = window.location.protocol === "https:" ? "; Secure" : "";
+    document.cookie = `__session=${token}; path=/; max-age=3600; SameSite=Lax${secure}`;
+  } else {
+    document.cookie = "__session=; path=/; max-age=0";
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [appUser, setAppUser] = useState<AppUser | null>(null);
@@ -53,8 +69,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const auth = getClientAuth();
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: User | null) => {
+    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser: User | null) => {
       setUser(firebaseUser);
+      await setSessionCookie(firebaseUser);
 
       if (firebaseUser) {
         // Fix #8: wrap Firestore read in try/catch with finally to guarantee
