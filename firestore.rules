@@ -1,0 +1,134 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Andela LMS — Firestore Security Rules
+//
+// Role is stored as a custom claim: request.auth.token.role
+//   "admin"   → full read/write on course/cohort/user data
+//   "learner" → read courses assigned to their cohorts; write own progress
+//
+// The custom claim is set by the bulkOnboard Cloud Function via
+// admin.auth().setCustomUserClaims(uid, { role }). Clients must call
+// user.getIdToken(true) to force-refresh the token after onboarding.
+// ─────────────────────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ────────────────────────────────────────────────────
+
+    // Is the caller authenticated at all?
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    // Does the caller have the admin custom claim?
+    function isAdmin() {
+      return isAuthed() && request.auth.token.role == "admin";
+    }
+
+    // Is the caller a learner (any authenticated non-admin is treated as learner)?
+    function isLearner() {
+      return isAuthed() && request.auth.token.role == "learner";
+    }
+
+    // Is the caller operating on their own data?
+    function isOwner(uid) {
+      return isAuthed() && request.auth.uid == uid;
+    }
+
+    // ── users/{uid} ─────────────────────────────────────────────────────────
+    match /users/{uid} {
+      // Users can read their own doc; admins can read/write any user doc
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ── cohorts/{id} ────────────────────────────────────────────────────────
+    // Fix #15: restrict cohort reads — admins or a learner who is a member
+    // (cohort id must appear in the caller's users/{uid}.cohortIds).
+    // Removed the previous blanket isAuthed() read.
+    match /cohorts/{cohortId} {
+      allow read: if isAdmin()
+        || (isLearner()
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cohortIds.hasAny([cohortId])
+           );
+      allow write: if isAdmin();
+    }
+
+    // ── courses/{id} ────────────────────────────────────────────────────────
+    match /courses/{courseId} {
+      // Admins have full access.
+      // Learners can read published courses that include one of their cohorts.
+      allow read: if isAdmin()
+        || (isLearner()
+            && resource.data.status == "published"
+            && resource.data.assignedCohortIds.hasAny(
+                 get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cohortIds
+               )
+           );
+      allow write: if isAdmin();
+
+      // Fix #14: modules subcollection — enforce same cohort-assignment check
+      // as the course-level rule (not just published status).
+      match /modules/{moduleId} {
+        allow read: if isAdmin()
+          || (isLearner()
+              && get(/databases/$(database)/documents/courses/$(courseId)).data.status == "published"
+              && get(/databases/$(database)/documents/courses/$(courseId)).data.assignedCohortIds.hasAny(
+                   get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cohortIds
+                 )
+             );
+        allow write: if isAdmin();
+
+        // Fix #14: lessons subcollection — enforce same cohort-assignment check
+        // as the course-level rule (not just published status).
+        match /lessons/{lessonId} {
+          allow read: if isAdmin()
+            || (isLearner()
+                && get(/databases/$(database)/documents/courses/$(courseId)).data.status == "published"
+                && get(/databases/$(database)/documents/courses/$(courseId)).data.assignedCohortIds.hasAny(
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cohortIds
+                   )
+               );
+          allow write: if isAdmin();
+        }
+      }
+    }
+
+    // ── enrollments/{uid_courseId} ──────────────────────────────────────────
+    // Fix #16: learner may only write their own enrollment AND only for a course
+    // assigned to one of their cohorts (verified via get() on the course doc).
+    // enrollmentId format: "{userId}_{courseId}"
+    match /enrollments/{enrollmentId} {
+      allow read: if isAdmin()
+        || (isAuthed() && enrollmentId.matches(request.auth.uid + "_.*"));
+
+      // Fix #16: write requires own doc AND cohort assignment check
+      allow write: if isAdmin()
+        || (isAuthed()
+            && enrollmentId.matches(request.auth.uid + "_.*")
+            && get(/databases/$(database)/documents/courses/$(enrollmentId.split("_")[1])).data.assignedCohortIds.hasAny(
+                 get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cohortIds
+               )
+           );
+    }
+
+    // ── progress/{uid_lessonId} ─────────────────────────────────────────────
+    match /progress/{progressId} {
+      // Learner can read/write their own progress docs.
+      // progressId format: "{userId}_{lessonId}"
+      allow read: if isAdmin()
+        || (isAuthed() && progressId.matches(request.auth.uid + "_.*"));
+      allow write: if isAdmin()
+        || (isAuthed() && progressId.matches(request.auth.uid + "_.*"));
+    }
+
+    // ── mail/{id} ───────────────────────────────────────────────────────────
+    // Written by Cloud Functions (admin SDK bypasses rules).
+    // No client reads allowed — email content is sensitive.
+    match /mail/{id} {
+      allow read, write: if false; // admin SDK only
+    }
+  }
+}

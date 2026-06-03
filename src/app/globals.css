@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --brand-primary: #13403A;
+    --brand-accent: #8FB85C;
+  }
+
+  html {
+    @apply font-sans antialiased;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900 min-h-screen;
+  }
+
+  /* Focus visible ring using brand color */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-brand-accent ring-offset-2;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg
+           bg-brand-primary text-white font-medium text-sm
+           hover:bg-brand-dark transition-colors disabled:opacity-50
+           disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg
+           border border-brand-primary text-brand-primary font-medium text-sm
+           hover:bg-brand-light transition-colors disabled:opacity-50;
+  }
+
+  .btn-accent {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg
+           bg-brand-accent text-white font-medium text-sm
+           hover:opacity-90 transition-opacity disabled:opacity-50;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
+           focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent
+           placeholder:text-gray-400 bg-white;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+}

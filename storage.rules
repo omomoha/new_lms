@@ -1,0 +1,36 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Andela LMS — Firebase Storage Security Rules
+//
+// Layout:
+//   videos/{courseId}/{moduleId}/{filename}  — lesson video files
+//   (future) thumbnails/{courseId}/{filename}
+//
+// Policy:
+//   - Any authenticated user can read videos (learner watching their course)
+//   - Only admins (custom claim role == "admin") can upload/delete
+// ─────────────────────────────────────────────────────────────────────────────
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Videos — authenticated read; admin write
+    match /videos/{courseId}/{allPaths=**} {
+      // All authenticated users can stream/download videos.
+      // (Firestore rules already gate which courses a learner can access —
+      //  the storage rule is a second layer ensuring unauthenticated users
+      //  cannot hot-link video URLs.)
+      allow read: if request.auth != null;
+
+      // Only admins (custom claim) may upload, update, or delete videos.
+      allow write: if request.auth != null
+        && request.auth.token.role == "admin";
+    }
+
+    // Catch-all: deny everything else
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
