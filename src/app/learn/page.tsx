@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, query, where } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Course, Enrollment } from "@/types";
@@ -20,13 +20,23 @@ export default function LearnDashboard() {
     (async () => {
       setLoading(true);
       try {
-        // Fetch all published courses assigned to the user's cohorts
-        const courseSnap = await getDocs(collection(db, "courses"));
-        const allCourses = courseSnap.docs.map((d) => d.data() as Course);
-        const enrolled = allCourses.filter(
-          (c) =>
-            c.status === "published" &&
-            c.assignedCohortIds.some((id) => appUser.cohortIds.includes(id))
+        // Firestore rules are NOT filters: learners may only run queries whose
+        // constraints provably satisfy the rules. So query published courses
+        // assigned to the learner's cohorts directly.
+        if (!appUser.cohortIds || appUser.cohortIds.length === 0) {
+          setCourses([]);
+          return;
+        }
+        const courseSnap = await getDocs(
+          query(
+            collection(db, "courses"),
+            where("status", "==", "published"),
+            // array-contains-any supports at most 10 values
+            where("assignedCohortIds", "array-contains-any", appUser.cohortIds.slice(0, 10))
+          )
+        );
+        const enrolled = courseSnap.docs.map(
+          (d) => ({ id: d.id, ...d.data() } as Course)
         );
 
         // Fetch enrollments for progress

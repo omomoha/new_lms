@@ -7,7 +7,9 @@ import { useEffect } from "react";
 
 const NAV = [
   { href: "/admin/courses", label: "Courses" },
-  { href: "/admin/onboarding", label: "Onboard Users" },
+  { href: "/admin/cohorts", label: "Cohorts" },
+  { href: "/admin/users", label: "Users" },
+  { href: "/admin/onboarding", label: "Bulk Onboard" },
 ];
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {

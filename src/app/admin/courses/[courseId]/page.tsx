@@ -17,10 +17,12 @@ import {
   serverTimestamp,
   query,
   orderBy,
+  arrayUnion,
+  arrayRemove,
 } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
 import { videoService } from "@/lib/video";
-import type { Course, CourseModule, Lesson, LessonType } from "@/types";
+import type { Course, CourseModule, Lesson, LessonType, Cohort } from "@/types";
 import AdminShell from "@/components/layout/AdminShell";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
@@ -35,6 +37,7 @@ export default function CourseBuilderPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<CourseModule[]>([]);
   const [lessonMap, setLessonMap] = useState<Record<string, Lesson[]>>({});
+  const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Module form
@@ -59,6 +62,9 @@ export default function CourseBuilderPage() {
       if (!courseSnap.exists()) { router.push("/admin/courses"); return; }
       const courseData = courseSnap.data() as Course;
       setCourse(courseData);
+
+      const cohortSnap = await getDocs(collection(db, "cohorts"));
+      setCohorts(cohortSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Cohort)));
 
       const modSnap = await getDocs(
         query(collection(db, "courses", courseId, "modules"), orderBy("order"))
@@ -161,6 +167,30 @@ export default function CourseBuilderPage() {
     setCourse({ ...course, status: next });
   };
 
+  // Grant/revoke a cohort's access to this course. Kept symmetric on both
+  // sides (course.assignedCohortIds + cohort.courseIds) for reporting.
+  const toggleCohortAccess = async (cohortId: string) => {
+    if (!course) return;
+    const has = (course.assignedCohortIds ?? []).includes(cohortId);
+    setError(null);
+    try {
+      await updateDoc(doc(db, "courses", courseId), {
+        assignedCohortIds: has ? arrayRemove(cohortId) : arrayUnion(cohortId),
+      });
+      await updateDoc(doc(db, "cohorts", cohortId), {
+        courseIds: has ? arrayRemove(courseId) : arrayUnion(courseId),
+      });
+      setCourse({
+        ...course,
+        assignedCohortIds: has
+          ? (course.assignedCohortIds ?? []).filter((id) => id !== cohortId)
+          : [...(course.assignedCohortIds ?? []), cohortId],
+      });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update cohort access");
+    }
+  };
+
   if (loading) return (
     <AdminShell>
       <div className="flex justify-center py-20"><Spinner /></div>
@@ -195,6 +225,46 @@ export default function CourseBuilderPage() {
           {error}
         </div>
       )}
+
+      {/* Cohort access */}
+      <div className="card mb-4">
+        <h2 className="font-medium text-gray-900 mb-1">Cohort access</h2>
+        <p className="text-xs text-gray-500 mb-3">
+          Learners see this course only when it is <b>published</b> and assigned to
+          one of their cohorts.
+        </p>
+        {cohorts.length === 0 ? (
+          <p className="text-xs text-gray-400">
+            No cohorts yet — create one under the Cohorts tab.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {cohorts.map((c) => {
+              const on = (course.assignedCohortIds ?? []).includes(c.id);
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => toggleCohortAccess(c.id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    on
+                      ? "text-white"
+                      : "text-gray-600 bg-white border-gray-300 hover:border-gray-400"
+                  }`}
+                  style={
+                    on
+                      ? { backgroundColor: c.color || "#2C7A6B", borderColor: c.color || "#2C7A6B" }
+                      : {}
+                  }
+                  title={on ? `Revoke ${c.name}` : `Grant ${c.name}`}
+                >
+                  {on ? "✓ " : ""}
+                  {c.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Modules */}
       <div className="space-y-4">
