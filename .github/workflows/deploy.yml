@@ -1,19 +1,21 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Andela LMS — CI/CD Pipeline
-# Triggers on push to main branch.
 #
-# Required GitHub Secrets (Settings → Secrets → Actions):
-#   FIREBASE_SERVICE_ACCOUNT  — JSON key for a Firebase Admin service account
-#                               with roles: Firebase Admin, Cloud Functions Admin,
-#                               Storage Admin, Firestore Admin.
-#                               Generate: Firebase Console → Project Settings →
-#                               Service Accounts → Generate new private key.
-#   FIREBASE_TOKEN            — (alternative) `firebase login:ci` token.
-#                               Either FIREBASE_SERVICE_ACCOUNT or FIREBASE_TOKEN
-#                               is sufficient; service account is preferred for CI.
+# Pull requests → quality checks only.
+# Push to main  → checks, then a full `firebase deploy` (Next.js SSR hosting +
+#                 Cloud Functions + Firestore/Storage rules) using the CLI's
+#                 web-frameworks support — the same mechanism as a local deploy.
 #
-# Environment variables baked in at build time must be added as:
-#   NEXT_PUBLIC_FIREBASE_API_KEY, etc. — add as GitHub Secrets and expose below.
+# Required GitHub Secrets (Settings → Secrets and variables → Actions):
+#   FIREBASE_SERVICE_ACCOUNT                  — full JSON of a service-account key
+#                                               (Firebase Console → Project settings
+#                                               → Service accounts → Generate key)
+#   NEXT_PUBLIC_FIREBASE_API_KEY              ┐
+#   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN          │ public web config — baked into the
+#   NEXT_PUBLIC_FIREBASE_PROJECT_ID           │ client bundle at build time
+#   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET       │ (same values as .env.local)
+#   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID  │
+#   NEXT_PUBLIC_FIREBASE_APP_ID               ┘
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: Deploy to Firebase
@@ -26,9 +28,10 @@ on:
 
 env:
   NODE_VERSION: "20"
+  PROJECT_ID: andela-lms-dae5f
 
 jobs:
-  # ── Quality checks ──────────────────────────────────────────────────────────
+  # ── Quality gate ────────────────────────────────────────────────────────────
   check:
     name: Lint · Typecheck · Test
     runs-on: ubuntu-latest
@@ -52,10 +55,11 @@ jobs:
       - name: Run tests
         run: npm test
 
-  # ── Build ───────────────────────────────────────────────────────────────────
-  build:
-    name: Build Next.js
+  # ── Build + deploy everything (main only) ───────────────────────────────────
+  deploy:
+    name: Deploy (hosting SSR + functions + rules)
     needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -68,108 +72,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
+      # The service-account JSON is written to a temp file and exposed via
+      # GOOGLE_APPLICATION_CREDENTIALS — the standard auth path for firebase-tools.
+      - name: Write service-account key
+        run: |
+          cat > "$RUNNER_TEMP/sa.json" <<'EOF'
+          ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          EOF
+
+      - name: Enable Next.js web-frameworks support
+        run: npx firebase-tools@13 experiments:enable webframeworks
+
+      # One deploy covers everything: the frameworks adapter runs `next build`
+      # here (with the NEXT_PUBLIC_* env baked in), firebase.json's predeploy
+      # hook installs + compiles functions, and rules deploy alongside.
+      - name: Deploy to Firebase
+        run: npx firebase-tools@13 deploy --project "$PROJECT_ID" --non-interactive --force
         env:
-          # ── Add your Firebase config secrets here ──────────────────────────
-          # These correspond to .env.example — add each as a GitHub Secret.
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
           NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: nextjs-build
-          path: .next/
-          retention-days: 1
-
-  # ── Deploy Hosting ──────────────────────────────────────────────────────────
-  deploy-hosting:
-    name: Deploy to Firebase Hosting
-    needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: nextjs-build
-          path: .next/
-
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          # ── Add FIREBASE_SERVICE_ACCOUNT as a GitHub Secret ────────────────
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          channelId: live
-          projectId: andela-lms-dae5f
-
-  # ── Deploy Functions ────────────────────────────────────────────────────────
-  deploy-functions:
-    name: Deploy Cloud Functions
-    needs: check
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Install root dependencies
-        run: npm ci
-
-      - name: Install functions dependencies
-        run: cd functions && npm ci
-
-      - name: Build functions
-        run: cd functions && npm run build
-
-      - name: Deploy functions
-        uses: w9jds/firebase-action@master
-        with:
-          args: deploy --only functions --project andela-lms-dae5f
-        env:
-          # ── Use FIREBASE_SERVICE_ACCOUNT or FIREBASE_TOKEN ─────────────────
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-
-  # ── Deploy Firestore Rules + Storage Rules ──────────────────────────────────
-  deploy-rules:
-    name: Deploy Security Rules
-    needs: check
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Install root dependencies
-        run: npm ci
-
-      - name: Deploy Firestore + Storage rules
-        uses: w9jds/firebase-action@master
-        with:
-          args: deploy --only firestore:rules,storage --project andela-lms-dae5f
-        env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
