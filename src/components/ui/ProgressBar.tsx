@@ -6,10 +6,10 @@ interface ProgressBarProps {
 export function ProgressBar({ pct, className = "" }: ProgressBarProps) {
   const clamped = Math.max(0, Math.min(100, pct));
   return (
-    <div className={`w-full bg-gray-200 rounded-full h-2 overflow-hidden ${className}`}>
+    <div className={`w-full rounded-full h-2 overflow-hidden ${className}`} style={{ backgroundColor: "#E7F1DE" }}>
       <div
-        className="h-2 rounded-full bg-brand-accent transition-all duration-300"
-        style={{ width: `${clamped}%` }}
+        className="h-2 rounded-full transition-all duration-300"
+        style={{ width: `${clamped}%`, backgroundColor: "#2C7A6B" }}
         role="progressbar"
         aria-valuenow={clamped}
         aria-valuemin={0}

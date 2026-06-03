@@ -1,3 +1,5 @@
+import React from "react";
+
 interface BadgeProps {
   label: string;
   color?: string; // hex, e.g. "#8FB85C"
@@ -5,10 +7,17 @@ interface BadgeProps {
 }
 
 const VARIANT_CLASSES: Record<string, string> = {
-  default: "bg-gray-100 text-gray-700",
-  success: "bg-green-100 text-green-700",
-  warning: "bg-yellow-100 text-yellow-700",
+  default: "bg-gray-100 text-gray-600",
+  success: "text-white",
+  warning: "text-white",
   error: "bg-red-100 text-red-700",
+};
+
+const VARIANT_STYLES: Record<string, React.CSSProperties> = {
+  default: {},
+  success: { backgroundColor: "#2C7A6B" },
+  warning: { backgroundColor: "#8FB85C", color: "#13403A" },
+  error: {},
 };
 
 export function Badge({ label, color, variant = "default" }: BadgeProps) {
@@ -23,6 +32,6 @@ export function Badge({ label, color, variant = "default" }: BadgeProps) {
     );
   }
   return (
-    <span className={`badge ${VARIANT_CLASSES[variant]}`}>{label}</span>
+    <span className={`badge ${VARIANT_CLASSES[variant]}`} style={VARIANT_STYLES[variant]}>{label}</span>
   );
 }

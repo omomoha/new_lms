@@ -10,11 +10,17 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          primary: "#13403A",   // Deep green — Andela primary
-          accent: "#8FB85C",    // Moss green — Andela accent
-          dark: "#0C2E29",
-          light: "#E8F5E9",
-          muted: "#6B7280",
+          primary: "#13403A",      // ink — dominant deep forest green
+          primaryDark: "#0C2C28",  // ink2 — darker fill
+          accent: "#8FB85C",       // moss — lime accent
+          teal: "#2C7A6B",         // teal — secondary
+          cream: "#F5F7F4",        // page background
+          mint: "#E7F1DE",         // highlight bands / selected states
+          ink: "#1E302C",          // body text
+          muted: "#5E6E69",        // muted text
+          // Legacy keys kept for backward compatibility
+          dark: "#0C2C28",
+          light: "#E7F1DE",
         },
       },
       fontFamily: {

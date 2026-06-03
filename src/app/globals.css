@@ -6,6 +6,11 @@
   :root {
     --brand-primary: #13403A;
     --brand-accent: #8FB85C;
+    --brand-teal: #2C7A6B;
+    --brand-cream: #F5F7F4;
+    --brand-mint: #E7F1DE;
+    --brand-ink: #1E302C;
+    --brand-muted: #5E6E69;
   }
 
   html {
@@ -13,7 +18,9 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 min-h-screen;
+    background-color: #F5F7F4;
+    color: #1E302C;
+    @apply min-h-screen;
   }
 
   /* Focus visible ring using brand color */
@@ -23,36 +30,78 @@
 }
 
 @layer components {
+  /* ── Buttons ─────────────────────────────────────────── */
   .btn-primary {
     @apply inline-flex items-center justify-center px-4 py-2 rounded-lg
-           bg-brand-primary text-white font-medium text-sm
-           hover:bg-brand-dark transition-colors disabled:opacity-50
-           disabled:cursor-not-allowed;
+           font-semibold text-sm transition-colors
+           disabled:opacity-50 disabled:cursor-not-allowed;
+    background-color: #8FB85C;
+    color: #13403A;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-color: #7da84d;
   }
 
   .btn-secondary {
     @apply inline-flex items-center justify-center px-4 py-2 rounded-lg
-           border border-brand-primary text-brand-primary font-medium text-sm
-           hover:bg-brand-light transition-colors disabled:opacity-50;
+           border font-medium text-sm transition-colors
+           disabled:opacity-50;
+    background-color: #ffffff;
+    border-color: #DDE6DF;
+    color: #13403A;
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background-color: #E7F1DE;
   }
 
   .btn-accent {
     @apply inline-flex items-center justify-center px-4 py-2 rounded-lg
-           bg-brand-accent text-white font-medium text-sm
-           hover:opacity-90 transition-opacity disabled:opacity-50;
+           font-semibold text-sm transition-opacity disabled:opacity-50;
+    background-color: #8FB85C;
+    color: #13403A;
+  }
+  .btn-accent:hover:not(:disabled) {
+    opacity: 0.9;
   }
 
+  /* ── Inputs ──────────────────────────────────────────── */
   .input-field {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
+    @apply w-full px-3 py-2 border rounded-lg text-sm
            focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent
-           placeholder:text-gray-400 bg-white;
+           bg-white;
+    border-color: #DDE6DF;
+    color: #1E302C;
+  }
+  .input-field::placeholder {
+    color: #5E6E69;
   }
 
+  /* ── Cards ───────────────────────────────────────────── */
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6;
+    @apply bg-white rounded-xl shadow-sm p-4 sm:p-6;
+    border: 1px solid #DDE6DF;
   }
 
+  /* ── Badges ──────────────────────────────────────────── */
   .badge {
     @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  /* ── Page hero band ──────────────────────────────────── */
+  .page-hero {
+    @apply rounded-2xl px-6 py-7 mb-6;
+    background-color: #13403A;
+    color: #ffffff;
+  }
+
+  /* ── Kicker label ────────────────────────────────────── */
+  .kicker {
+    @apply text-xs font-bold uppercase tracking-widest mb-2 block;
+    color: #8FB85C;
+  }
+
+  /* ── Serif brand heading helper ──────────────────────── */
+  .font-serif-brand {
+    font-family: Georgia, 'Times New Roman', serif;
   }
 }

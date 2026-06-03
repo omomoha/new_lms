@@ -60,18 +60,20 @@ export default function LearnDashboard() {
   return (
     <LearnerShell>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
-        <div className="mb-6">
-          <h1 className="text-xl font-semibold text-gray-900">
+        {/* Learner hero band */}
+        <div className="page-hero mb-6">
+          <span className="kicker">MY LEARNING</span>
+          <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight">
             Welcome back{appUser?.name ? `, ${appUser.name.split(" ")[0]}` : ""}
           </h1>
-          <p className="text-sm text-gray-500">Continue your learning journey</p>
+          <p className="mt-1 text-sm" style={{ color: "#CFE0D5" }}>Continue your learning journey</p>
         </div>
 
         {loading ? (
           <div className="flex justify-center py-20"><Spinner /></div>
         ) : courses.length === 0 ? (
-          <div className="text-center py-20 text-gray-400">
-            <p className="text-4xl mb-2">🎓</p>
+          <div className="text-center py-20" style={{ color: "#5E6E69" }}>
+            <div className="mx-auto w-8 h-8 rounded-sm rotate-45 mb-4" style={{ backgroundColor: "#8FB85C" }} />
             <p>No courses assigned yet. Check back soon.</p>
           </div>
         ) : (
@@ -80,24 +82,29 @@ export default function LearnDashboard() {
               <Link
                 key={c.id}
                 href={`/learn/course/${c.id}`}
-                className="card hover:shadow-md transition-shadow group"
+                className="card hover:shadow-md transition-shadow group overflow-hidden !p-0"
               >
-                {/* Course thumbnail placeholder */}
-                <div className="w-full h-32 bg-gradient-to-br from-brand-primary to-brand-dark rounded-lg mb-3 flex items-center justify-center">
-                  <span className="text-3xl">📖</span>
+                {/* Ink → teal gradient thumbnail */}
+                <div
+                  className="w-full h-28 rounded-t-xl flex items-center justify-center"
+                  style={{ background: "linear-gradient(135deg, #13403A 0%, #2C7A6B 100%)" }}
+                >
+                  <div className="w-10 h-10 rounded-sm rotate-45 opacity-30" style={{ backgroundColor: "#8FB85C" }} />
                 </div>
-                <h2 className="font-medium text-gray-900 group-hover:text-brand-primary mb-1 line-clamp-2">
-                  {c.title}
-                </h2>
-                {c.description && (
-                  <p className="text-sm text-gray-500 line-clamp-2 mb-3">{c.description}</p>
-                )}
-                <div>
-                  <div className="flex justify-between text-xs text-gray-500 mb-1">
-                    <span>Progress</span>
-                    <span>{c.progressPct}%</span>
+                <div className="px-4 sm:px-5 pb-4 pt-3">
+                  <h2 className="font-medium mb-1 line-clamp-2 group-hover:text-brand-teal transition-colors" style={{ color: "#1E302C" }}>
+                    {c.title}
+                  </h2>
+                  {c.description && (
+                    <p className="text-sm line-clamp-2 mb-3" style={{ color: "#5E6E69" }}>{c.description}</p>
+                  )}
+                  <div>
+                    <div className="flex justify-between text-xs mb-1" style={{ color: "#5E6E69" }}>
+                      <span>Progress</span>
+                      <span style={{ color: "#2C7A6B", fontWeight: 600 }}>{c.progressPct}%</span>
+                    </div>
+                    <ProgressBar pct={c.progressPct} />
                   </div>
-                  <ProgressBar pct={c.progressPct} />
                 </div>
               </Link>
             ))}

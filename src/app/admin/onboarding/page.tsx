@@ -9,7 +9,7 @@
 import { useState, useRef } from "react";
 import { httpsCallable } from "firebase/functions";
 import functions from "@/lib/firebase/functions";
-import { parseOnboardingCsv } from "@/lib/csvParser";
+import { parseOnboardingFile, TEMPLATE_CSV } from "@/lib/csvParser";
 import type { OnboardingResult } from "@/types";
 import AdminShell from "@/components/layout/AdminShell";
 import { Spinner } from "@/components/ui/Spinner";
@@ -31,8 +31,7 @@ export default function OnboardingPage() {
     setCallError(null);
 
     // Pre-validate client-side so user sees errors before hitting the function
-    const text = await f.text();
-    const { errors } = await parseOnboardingCsv(text);
+    const { errors } = await parseOnboardingFile(f);
     setParseErrors(errors);
   };
 
@@ -42,8 +41,7 @@ export default function OnboardingPage() {
     setCalling(true); setCallError(null); setResults(null);
 
     try {
-      const text = await file.text();
-      const { valid, errors } = await parseOnboardingCsv(text);
+      const { valid, errors } = await parseOnboardingFile(file);
       setParseErrors(errors);
       if (valid.length === 0) { setCalling(false); return; }
 
@@ -66,23 +64,27 @@ export default function OnboardingPage() {
   return (
     <AdminShell>
       <div className="max-w-2xl">
-        <h1 className="text-xl font-semibold text-gray-900 mb-2">Bulk Onboard Users</h1>
-        <p className="text-sm text-gray-500 mb-6">
-          Upload a CSV file with columns: <code className="bg-gray-100 px-1 rounded">name, email, role, cohort_tag</code>.
-          The system will create Firebase Auth accounts, set role custom claims, and write
-          Firestore user docs. Temporary passwords are emailed via the Trigger Email extension.
-        </p>
+        {/* Page hero band */}
+        <div className="page-hero mb-6">
+          <span className="kicker">ADMIN · ONBOARDING</span>
+          <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight">
+            Bulk Onboard Users
+          </h1>
+          <p className="mt-1 text-sm" style={{ color: "#CFE0D5" }}>
+            Upload a CSV with <code className="font-mono">name, email, role, cohort_tag</code> to create accounts and assign cohorts.
+          </p>
+        </div>
 
         <div className="card mb-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                CSV File
+              <label className="block text-sm font-medium mb-1" style={{ color: "#1E302C" }}>
+                CSV / XLSX File
               </label>
               <input
                 ref={fileRef}
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                 className="hidden"
                 onChange={handleFileChange}
               />
@@ -92,7 +94,7 @@ export default function OnboardingPage() {
                   onClick={() => fileRef.current?.click()}
                   className="btn-secondary text-sm"
                 >
-                  Choose CSV
+                  Choose file (CSV / XLSX / XLS)
                 </button>
                 {file && (
                   <span className="text-sm text-gray-600 truncate max-w-xs">{file.name}</span>
@@ -100,11 +102,30 @@ export default function OnboardingPage() {
               </div>
             </div>
 
-            {/* Template download hint */}
-            <p className="text-xs text-gray-400">
-              Required columns: <strong>name</strong>, <strong>email</strong>,{" "}
-              <strong>role</strong> (admin|learner), <strong>cohort_tag</strong>
-            </p>
+            {/* Template download */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <p className="text-xs" style={{ color: "#5E6E69" }}>
+                Required columns: <strong>name</strong>, <strong>email</strong>,{" "}
+                <strong>role</strong> (admin|learner), <strong>cohort_tag</strong>.
+                Header capitalization and spaces are tolerated.
+              </p>
+              <button
+                type="button"
+                className="text-xs font-semibold hover:underline"
+                style={{ color: "#8FB85C" }}
+                onClick={() => {
+                  const blob = new Blob([TEMPLATE_CSV], { type: "text/csv" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "onboarding-template.csv";
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                ⬇ Download template
+              </button>
+            </div>
 
             {/* Parse errors */}
             {parseErrors.length > 0 && (

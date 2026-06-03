@@ -19,11 +19,53 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * Parse a CSV File/string into validated OnboardingRow[].
  * Returns both valid rows and per-row errors.
  */
+/** CSV template offered for download on the onboarding page. */
+export const TEMPLATE_CSV =
+  "name,email,role,cohort_tag\n" +
+  "Ada Lovelace,ada@example.com,learner,q3-2026\n" +
+  "Grace Hopper,grace@example.com,learner,q3-2026\n";
+
+/**
+ * Normalize a header cell: strip BOM, trim, lowercase, and convert
+ * spaces/dashes to underscores so "Cohort Tag" or "cohort-tag" → "cohort_tag".
+ * Makes Excel/Sheets exports work without hand-editing headers.
+ */
+function normalizeHeader(h: string): string {
+  return h
+    .replace(/^﻿/, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+/**
+ * Parse an uploaded file — .csv, .xlsx or .xls — into validated rows.
+ * Excel files are converted to CSV via SheetJS (first sheet), then run
+ * through the same validation path.
+ */
+export async function parseOnboardingFile(file: File): Promise<ParseResult> {
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  if (ext === "xlsx" || ext === "xls") {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore – xlsx is in package.json but types aren't installed in sandbox
+    const XLSX = await import("xlsx");
+    const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+    const firstSheet = wb.Sheets[wb.SheetNames[0]];
+    if (!firstSheet) {
+      return { valid: [], errors: [{ row: 0, message: "Workbook has no sheets" }] };
+    }
+    const csv = XLSX.utils.sheet_to_csv(firstSheet);
+    return parseOnboardingCsv(csv);
+  }
+  return parseOnboardingCsv(file);
+}
+
 export function parseOnboardingCsv(input: string | File): Promise<ParseResult> {
   return new Promise((resolve) => {
     Papa.parse<Record<string, string>>(input as string, {
       header: true,
       skipEmptyLines: true,
+      transformHeader: normalizeHeader,
       complete: (results) => {
         const valid: OnboardingRow[] = [];
         const errors: Array<{ row: number; message: string }> = [];

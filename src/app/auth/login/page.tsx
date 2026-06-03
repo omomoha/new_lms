@@ -36,7 +36,7 @@ function LoginForm() {
 
   return (
     <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6 sm:p-8">
-      <h1 className="text-xl font-semibold text-gray-900 mb-6">Welcome back</h1>
+      <h1 className="font-serif-brand text-xl font-normal mb-6" style={{ color: "#13403A" }}>Welcome back</h1>
 
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -46,7 +46,7 @@ function LoginForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="email" className="block text-sm font-medium mb-1" style={{ color: "#1E302C" }}>
             Email address
           </label>
           <input
@@ -62,7 +62,7 @@ function LoginForm() {
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="password" className="block text-sm font-medium mb-1" style={{ color: "#1E302C" }}>
             Password
           </label>
           <input
@@ -82,9 +82,9 @@ function LoginForm() {
         </button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-gray-500">
+      <p className="mt-6 text-center text-sm" style={{ color: "#5E6E69" }}>
         New here?{" "}
-        <a href="/auth/register" className="text-brand-primary font-medium hover:underline">Create an account</a>
+        <a href="/auth/register" className="font-semibold hover:underline" style={{ color: "#8FB85C" }}>Create an account</a>
       </p>
     </div>
   );
@@ -92,13 +92,13 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-brand-primary px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4" style={{ backgroundColor: "#13403A" }}>
       <div className="mb-8 text-center">
         <div className="inline-flex items-center gap-2 mb-2">
-          <span className="text-brand-accent font-bold text-3xl tracking-tight">Andela</span>
-          <span className="text-white font-light text-3xl">Learn</span>
+          <span className="font-serif-brand font-bold text-3xl tracking-tight" style={{ color: "#8FB85C" }}>Andela</span>
+          <span className="text-white font-light text-3xl">LMS</span>
         </div>
-        <p className="text-white/50 text-sm">Sign in to continue</p>
+        <p className="text-sm" style={{ color: "rgba(255,255,255,0.5)" }}>Sign in to continue</p>
       </div>
       <Suspense fallback={<div className="text-white/70 text-sm">Loading…</div>}>
         <LoginForm />

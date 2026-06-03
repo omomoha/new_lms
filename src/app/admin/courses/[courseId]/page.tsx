@@ -201,15 +201,20 @@ export default function CourseBuilderPage() {
 
   return (
     <AdminShell>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
-        <div className="flex-1">
-          <h1 className="text-xl font-semibold text-gray-900">{course.title}</h1>
+      {/* Page hero band */}
+      <div className="page-hero flex flex-col sm:flex-row sm:items-end gap-4 mb-6">
+        <div className="flex-1 min-w-0">
+          <span className="kicker">ADMIN · COURSE BUILDER</span>
+          <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight truncate">
+            {course.title}
+          </h1>
           {course.description && (
-            <p className="text-sm text-gray-500 mt-0.5">{course.description}</p>
+            <p className="mt-1 text-sm truncate" style={{ color: "#CFE0D5" }}>
+              {course.description}
+            </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <Badge
             label={course.status}
             variant={course.status === "published" ? "success" : "warning"}
@@ -228,13 +233,13 @@ export default function CourseBuilderPage() {
 
       {/* Cohort access */}
       <div className="card mb-4">
-        <h2 className="font-medium text-gray-900 mb-1">Cohort access</h2>
-        <p className="text-xs text-gray-500 mb-3">
+        <h2 className="font-medium mb-1" style={{ color: "#1E302C" }}>Cohort access</h2>
+        <p className="text-xs mb-3" style={{ color: "#5E6E69" }}>
           Learners see this course only when it is <b>published</b> and assigned to
           one of their cohorts.
         </p>
         {cohorts.length === 0 ? (
-          <p className="text-xs text-gray-400">
+          <p className="text-xs" style={{ color: "#5E6E69" }}>
             No cohorts yet — create one under the Cohorts tab.
           </p>
         ) : (
@@ -248,12 +253,12 @@ export default function CourseBuilderPage() {
                   className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                     on
                       ? "text-white"
-                      : "text-gray-600 bg-white border-gray-300 hover:border-gray-400"
+                      : "bg-white hover:border-brand-teal"
                   }`}
                   style={
                     on
                       ? { backgroundColor: c.color || "#2C7A6B", borderColor: c.color || "#2C7A6B" }
-                      : {}
+                      : { borderColor: "#DDE6DF", color: "#5E6E69" }
                   }
                   title={on ? `Revoke ${c.name}` : `Grant ${c.name}`}
                 >
@@ -269,9 +274,10 @@ export default function CourseBuilderPage() {
       {/* Modules */}
       <div className="space-y-4">
         {modules.map((mod) => (
-          <div key={mod.id} className="card">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-medium text-gray-900">{mod.title}</h2>
+          <div key={mod.id} className="card overflow-hidden !p-0">
+            {/* Module header strip */}
+            <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b" style={{ borderColor: "#DDE6DF", backgroundColor: "#F5F7F4" }}>
+              <h2 className="font-semibold text-sm" style={{ color: "#13403A" }}>{mod.title}</h2>
               <button
                 onClick={() => setAddingLessonTo(addingLessonTo === mod.id ? null : mod.id)}
                 className="btn-secondary text-xs px-2.5 py-1"
@@ -279,103 +285,106 @@ export default function CourseBuilderPage() {
                 + Lesson
               </button>
             </div>
-
-            {/* Lesson list */}
-            {(lessonMap[mod.id] ?? []).length > 0 ? (
-              <ul className="space-y-1.5 mb-3">
-                {(lessonMap[mod.id] ?? []).map((lesson) => (
-                  <li
-                    key={lesson.id}
-                    className="flex items-center gap-2 text-sm text-gray-700 px-2 py-1.5 bg-gray-50 rounded-lg"
-                  >
-                    <span className="text-xs text-brand-accent font-medium uppercase">
-                      {lesson.type}
-                    </span>
-                    <span>{lesson.title}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-xs text-gray-400 mb-3">No lessons yet.</p>
-            )}
-
-            {/* Add lesson form */}
-            {addingLessonTo === mod.id && (
-              <form
-                onSubmit={(e) => handleAddLesson(e, mod.id)}
-                className="border-t pt-3 space-y-3"
-              >
-                <input
-                  className="input-field"
-                  placeholder="Lesson title"
-                  value={lessonTitle}
-                  onChange={(e) => setLessonTitle(e.target.value)}
-                  required
-                />
-                <select
-                  className="input-field"
-                  value={lessonType}
-                  onChange={(e) => setLessonType(e.target.value as LessonType)}
-                >
-                  {LESSON_TYPES.map((t) => (
-                    <option key={t} value={t}>{t}</option>
+            <div className="px-4 sm:px-5 py-3">
+              {/* Lesson list */}
+              {(lessonMap[mod.id] ?? []).length > 0 ? (
+                <ul className="space-y-1.5 mb-3">
+                  {(lessonMap[mod.id] ?? []).map((lesson) => (
+                    <li
+                      key={lesson.id}
+                      className="flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg"
+                      style={{ backgroundColor: "#E7F1DE", color: "#1E302C" }}
+                    >
+                      <span className="text-xs font-semibold uppercase" style={{ color: "#2C7A6B" }}>
+                        {lesson.type}
+                      </span>
+                      <span>{lesson.title}</span>
+                    </li>
                   ))}
-                </select>
+                </ul>
+              ) : (
+                <p className="text-xs mb-3" style={{ color: "#5E6E69" }}>No lessons yet.</p>
+              )}
 
-                {lessonType === "video" && (
-                  <div>
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      accept="video/*"
-                      className="hidden"
-                      onChange={(e) => setVideoFile(e.target.files?.[0] ?? null)}
+              {/* Add lesson form */}
+              {addingLessonTo === mod.id && (
+                <form
+                  onSubmit={(e) => handleAddLesson(e, mod.id)}
+                  className="border-t pt-3 space-y-3"
+                  style={{ borderColor: "#DDE6DF" }}
+                >
+                  <input
+                    className="input-field"
+                    placeholder="Lesson title"
+                    value={lessonTitle}
+                    onChange={(e) => setLessonTitle(e.target.value)}
+                    required
+                  />
+                  <select
+                    className="input-field"
+                    value={lessonType}
+                    onChange={(e) => setLessonType(e.target.value as LessonType)}
+                  >
+                    {LESSON_TYPES.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+
+                  {lessonType === "video" && (
+                    <div>
+                      <input
+                        ref={fileRef}
+                        type="file"
+                        accept="video/*"
+                        className="hidden"
+                        onChange={(e) => setVideoFile(e.target.files?.[0] ?? null)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileRef.current?.click()}
+                        className="btn-secondary text-xs"
+                      >
+                        {videoFile ? videoFile.name : "Choose video file"}
+                      </button>
+                      {uploadPct !== null && (
+                        <div className="mt-2">
+                          <div className="w-full rounded-full h-1.5" style={{ backgroundColor: "#DDE6DF" }}>
+                            <div
+                              className="h-1.5 rounded-full transition-all"
+                              style={{ width: `${uploadPct}%`, backgroundColor: "#8FB85C" }}
+                            />
+                          </div>
+                          <p className="text-xs mt-1" style={{ color: "#5E6E69" }}>{uploadPct}%</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {lessonType === "text" && (
+                    <textarea
+                      className="input-field resize-none"
+                      rows={4}
+                      placeholder="Lesson content (HTML or Markdown)"
+                      value={lessonText}
+                      onChange={(e) => setLessonText(e.target.value)}
                     />
+                  )}
+
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={saving} className="btn-primary text-xs">
+                      {saving ? "Saving…" : "Add Lesson"}
+                    </button>
                     <button
                       type="button"
-                      onClick={() => fileRef.current?.click()}
+                      onClick={() => setAddingLessonTo(null)}
                       className="btn-secondary text-xs"
                     >
-                      {videoFile ? videoFile.name : "Choose video file"}
+                      Cancel
                     </button>
-                    {uploadPct !== null && (
-                      <div className="mt-2">
-                        <div className="w-full bg-gray-200 rounded-full h-1.5">
-                          <div
-                            className="bg-brand-accent h-1.5 rounded-full transition-all"
-                            style={{ width: `${uploadPct}%` }}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">{uploadPct}%</p>
-                      </div>
-                    )}
                   </div>
-                )}
-
-                {lessonType === "text" && (
-                  <textarea
-                    className="input-field resize-none"
-                    rows={4}
-                    placeholder="Lesson content (HTML or Markdown)"
-                    value={lessonText}
-                    onChange={(e) => setLessonText(e.target.value)}
-                  />
-                )}
-
-                <div className="flex gap-2">
-                  <button type="submit" disabled={saving} className="btn-primary text-xs">
-                    {saving ? "Saving…" : "Add Lesson"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAddingLessonTo(null)}
-                    className="btn-secondary text-xs"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
+                </form>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -383,7 +392,7 @@ export default function CourseBuilderPage() {
       {/* Add module */}
       {addingModule ? (
         <form onSubmit={handleAddModule} className="card mt-4 space-y-3">
-          <h2 className="font-medium">New Module</h2>
+          <h2 className="font-medium" style={{ color: "#1E302C" }}>New Module</h2>
           <input
             className="input-field"
             placeholder="Module title"

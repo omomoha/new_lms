@@ -110,12 +110,12 @@ export default function LessonPage() {
   const SidebarContent = () => (
     <nav className="h-full overflow-y-auto p-4 space-y-4">
       <div className="mb-2">
-        <Link href={`/learn/course/${courseId}`} className="text-xs text-brand-primary hover:underline">
+        <Link href={`/learn/course/${courseId}`} className="text-xs font-medium hover:underline" style={{ color: "#8FB85C" }}>
           ← {course.title}
         </Link>
         {enrollment && (
           <div className="mt-2">
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
+            <div className="flex justify-between text-xs mb-1" style={{ color: "#5E6E69" }}>
               <span>Progress</span><span>{enrollment.progressPct}%</span>
             </div>
             <ProgressBar pct={enrollment.progressPct} />
@@ -124,7 +124,7 @@ export default function LessonPage() {
       </div>
       {modules.map((mod) => (
         <div key={mod.id}>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+          <p className="text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: "#5E6E69" }}>
             {mod.title}
           </p>
           <ul className="space-y-0.5">
@@ -135,15 +135,23 @@ export default function LessonPage() {
                 <li key={l.id}>
                   <Link
                     href={`/learn/course/${courseId}/lesson/${l.id}`}
-                    className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors ${
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors"
+                    style={
                       current
-                        ? "bg-brand-primary text-white"
-                        : "hover:bg-gray-100 text-gray-700"
-                    }`}
+                        ? { backgroundColor: "#E7F1DE", color: "#13403A", fontWeight: 500 }
+                        : { color: "#1E302C" }
+                    }
                   >
-                    <span className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center text-xs ${
-                      done ? "bg-brand-accent text-white" : current ? "bg-white/20" : "border border-gray-300"
-                    }`}>
+                    <span
+                      className="w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold"
+                      style={
+                        done
+                          ? { backgroundColor: "#8FB85C", color: "#fff" }
+                          : current
+                          ? { border: "2px solid #13403A" }
+                          : { border: "1px solid #DDE6DF" }
+                      }
+                    >
                       {done ? "✓" : ""}
                     </span>
                     <span className="truncate text-xs">{l.title}</span>
@@ -160,14 +168,15 @@ export default function LessonPage() {
   return (
     <LearnerShell>
       {/* Mobile header with sidebar toggle */}
-      <div className="lg:hidden flex items-center px-4 py-2 border-b border-gray-200 bg-white">
+      <div className="lg:hidden flex items-center px-4 py-2 border-b bg-white" style={{ borderColor: "#DDE6DF" }}>
         <button
           onClick={() => setSidebarOpen((v) => !v)}
-          className="text-sm text-brand-primary font-medium mr-3"
+          className="text-sm font-semibold mr-3"
+          style={{ color: "#13403A" }}
         >
           ☰ Contents
         </button>
-        <h2 className="text-sm font-medium text-gray-900 truncate">{lesson.title}</h2>
+        <h2 className="text-sm font-medium truncate" style={{ color: "#1E302C" }}>{lesson.title}</h2>
       </div>
 
       {/* Mobile sidebar overlay */}
@@ -185,13 +194,13 @@ export default function LessonPage() {
 
       <div className="flex h-[calc(100vh-7rem)]">
         {/* Desktop sidebar */}
-        <aside className="hidden lg:flex w-72 flex-shrink-0 border-r border-gray-200 bg-white flex-col">
+        <aside className="hidden lg:flex w-72 flex-shrink-0 border-r bg-white flex-col" style={{ borderColor: "#DDE6DF" }}>
           <SidebarContent />
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-6">
-          <h1 className="text-lg font-semibold text-gray-900 mb-4">{lesson.title}</h1>
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-6" style={{ backgroundColor: "#F5F7F4" }}>
+          <h1 className="font-serif-brand text-xl font-normal mb-4" style={{ color: "#13403A" }}>{lesson.title}</h1>
 
           {/* Fix #5: only render VideoPlayer once allLessonIds is populated */}
           {lesson.type === "video" && lesson.videoPath && appUser ? (
@@ -214,15 +223,15 @@ export default function LessonPage() {
               }}
             />
           ) : lesson.type === "video" && !lesson.videoPath ? (
-            <div className="w-full aspect-video bg-gray-100 rounded-xl flex items-center justify-center text-gray-400">
+            <div className="w-full aspect-video rounded-xl flex items-center justify-center" style={{ backgroundColor: "#E7F1DE", color: "#5E6E69" }}>
               Video not yet uploaded.
             </div>
           ) : (
-            <div className="card text-center py-12 text-gray-400">
-              <p className="text-3xl mb-2">📄</p>
+            <div className="card text-center py-12" style={{ color: "#5E6E69" }}>
+              <div className="mx-auto w-8 h-8 rounded-sm rotate-45 mb-4" style={{ backgroundColor: "#8FB85C" }} />
               <p className="text-sm">
                 {lesson.fileUrl ? (
-                  <a href={lesson.fileUrl} target="_blank" rel="noopener noreferrer" className="text-brand-primary hover:underline">
+                  <a href={lesson.fileUrl} target="_blank" rel="noopener noreferrer" className="hover:underline font-medium" style={{ color: "#2C7A6B" }}>
                     Open {lesson.type} resource →
                   </a>
                 ) : (

@@ -83,10 +83,14 @@ export default function UsersPage() {
 
   return (
     <AdminShell>
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+      {/* Page hero band */}
+      <div className="page-hero flex flex-col sm:flex-row sm:items-end gap-4">
         <div className="flex-1">
-          <h1 className="text-xl font-semibold text-gray-900">Users</h1>
-          <p className="text-sm text-gray-500">
+          <span className="kicker">ADMIN · USERS</span>
+          <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight">
+            Users
+          </h1>
+          <p className="mt-1 text-sm" style={{ color: "#CFE0D5" }}>
             Toggle cohort chips to add or remove a learner from a cohort.
           </p>
         </div>
@@ -109,8 +113,8 @@ export default function UsersPage() {
           <Spinner />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">
-          <p className="text-4xl mb-2">👤</p>
+        <div className="text-center py-20" style={{ color: "#5E6E69" }}>
+          <div className="mx-auto w-8 h-8 rounded-sm rotate-45 mb-4" style={{ backgroundColor: "#8FB85C" }} />
           <p>No users found.</p>
         </div>
       ) : (
@@ -122,7 +126,7 @@ export default function UsersPage() {
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-900 truncate">
+                  <span className="font-medium truncate" style={{ color: "#1E302C" }}>
                     {u.name || u.email}
                   </span>
                   <Badge
@@ -130,11 +134,11 @@ export default function UsersPage() {
                     variant={u.role === "admin" ? "success" : "default"}
                   />
                 </div>
-                <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                <p className="text-xs truncate" style={{ color: "#5E6E69" }}>{u.email}</p>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {cohorts.length === 0 ? (
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs" style={{ color: "#5E6E69" }}>
                     No cohorts yet — create one first.
                   </span>
                 ) : (
@@ -146,14 +150,12 @@ export default function UsersPage() {
                         disabled={busyUid === u.uid}
                         onClick={() => toggleCohort(u, c.id)}
                         className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                          on
-                            ? "text-white"
-                            : "text-gray-600 bg-white border-gray-300 hover:border-gray-400"
+                          on ? "text-white" : "bg-white hover:border-brand-teal"
                         }`}
                         style={
                           on
                             ? { backgroundColor: c.color || "#2C7A6B", borderColor: c.color || "#2C7A6B" }
-                            : {}
+                            : { borderColor: "#DDE6DF", color: "#5E6E69" }
                         }
                         title={on ? `Remove from ${c.name}` : `Add to ${c.name}`}
                       >

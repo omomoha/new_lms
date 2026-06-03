@@ -26,38 +26,43 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   if (loading || !user) return null;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F5F7F4" }}>
       {/* Top nav */}
-      <header className="bg-brand-primary text-white h-14 flex items-center px-4 sm:px-6 gap-4 sticky top-0 z-30">
-        <Link href="/admin/courses" className="font-bold text-brand-accent text-lg mr-2">
-          Andela <span className="text-white font-light">Learn</span>
-        </Link>
-        <span className="text-white/30 hidden sm:block">|</span>
-        <nav className="flex gap-1 flex-1">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                pathname.startsWith(item.href)
-                  ? "bg-white/10 text-white"
-                  : "text-white/70 hover:text-white hover:bg-white/5"
-              }`}
+      <header className="sticky top-0 z-30 text-white" style={{ backgroundColor: "#13403A" }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3 flex-wrap sm:flex-nowrap">
+          {/* Wordmark */}
+          <Link href="/admin/courses" className="font-bold text-lg mr-2 flex-shrink-0" style={{ color: "#8FB85C" }}>
+            Andela <span className="text-white font-light">LMS</span>
+          </Link>
+          <span className="text-white/30 hidden sm:block flex-shrink-0">|</span>
+          {/* Nav — wraps on mobile */}
+          <nav className="flex flex-wrap gap-1 flex-1 min-w-0">
+            {NAV.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex-shrink-0 ${
+                  pathname.startsWith(item.href)
+                    ? "text-brand-primary font-semibold"
+                    : "text-white/70 hover:text-white hover:bg-white/5"
+                }`}
+                style={pathname.startsWith(item.href) ? { backgroundColor: "#E7F1DE", color: "#13403A" } : {}}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <span className="text-xs text-white/50 hidden sm:block truncate max-w-[140px]">
+              {appUser?.name || appUser?.email}
+            </span>
+            <button
+              onClick={() => signOut().then(() => router.push("/auth/login"))}
+              className="text-xs text-white/60 hover:text-white transition-colors"
             >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-white/50 hidden sm:block">
-            {appUser?.name || appUser?.email}
-          </span>
-          <button
-            onClick={() => signOut().then(() => router.push("/auth/login"))}
-            className="text-xs text-white/60 hover:text-white transition-colors"
-          >
-            Sign out
-          </button>
+              Sign out
+            </button>
+          </div>
         </div>
       </header>
 
