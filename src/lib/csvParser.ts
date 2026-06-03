@@ -68,7 +68,7 @@ export function parseOnboardingCsv(input: string | File): Promise<ParseResult> {
 
         resolve({ valid, errors });
       },
-      error: (err) => {
+      error: (err: Error) => {
         resolve({
           valid: [],
           errors: [{ row: 0, message: `Parse error: ${err.message}` }],
