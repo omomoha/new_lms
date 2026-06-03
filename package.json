@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --exclude tests/firestore.rules.test.ts",
+    "test": "vitest run tests/csvParser.test.ts tests/progress.test.ts tests/roleGuard.test.ts",
     "test:rules": "vitest run tests/firestore.rules.test.ts"
   },
   "dependencies": {
