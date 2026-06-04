@@ -27,9 +27,11 @@ service cloud.firestore {
       return isAuthed() && request.auth.token.role == "admin";
     }
 
-    // Is the caller a learner (any authenticated non-admin is treated as learner)?
+    // Any authenticated NON-admin is a learner. Deliberately claim-optional:
+    // accounts created before the syncRoleClaim trigger existed carry no role
+    // claim at all, and learner is the lowest-privilege default anyway.
     function isLearner() {
-      return isAuthed() && request.auth.token.role == "learner";
+      return isAuthed() && request.auth.token.role != "admin";
     }
 
     // Is the caller operating on their own data?

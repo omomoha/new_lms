@@ -16,6 +16,7 @@ export default function LearnDashboard() {
   const { appUser } = useAuth();
   const [courses, setCourses] = useState<CourseWithAccess[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!appUser) return;
@@ -76,6 +77,11 @@ export default function LearnDashboard() {
         });
 
         setCourses(withAccessAndProgress);
+      } catch (err: unknown) {
+        console.error("LearnDashboard load failed:", err);
+        setLoadError(
+          err instanceof Error ? err.message : "Failed to load courses"
+        );
       } finally {
         setLoading(false);
       }
@@ -93,6 +99,12 @@ export default function LearnDashboard() {
           </h1>
           <p className="mt-1 text-sm" style={{ color: "#CFE0D5" }}>Continue your learning journey</p>
         </div>
+
+        {loadError && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            {loadError}
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-20"><Spinner /></div>
