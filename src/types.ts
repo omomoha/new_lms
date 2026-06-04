@@ -46,6 +46,8 @@ export interface Course {
   assignedCohortIds: string[];
   createdAt: Timestamp;
   thumbPath?: string;           // Firebase Storage path for course thumbnail
+  certTemplatePath?: string;    // Phase 3: Storage path to a custom certificate background (PNG/JPG)
+  certTemplateTextColor?: "dark" | "light"; // overlay text color for the custom template
 }
 
 // ─── Module (subcollection: courses/{id}/modules/{mid}) ──────────────────────
@@ -71,6 +73,8 @@ export interface Lesson {
   textContent?: string;    // HTML or Markdown for text lessons
   fileUrl?: string;        // For slides/doc/lab: public download URL (legacy — prefer filePath)
   filePath?: string;       // Firebase Storage path for slides/doc/lab resources — use FileService.getResourceUrl()
+  captionsPath?: string;   // Phase 3: Firebase Storage path to a WebVTT (.vtt) captions file
+  transcript?: string;     // Phase 3: plain-text transcript shown below the video player
 }
 
 // ─── Enrollment ──────────────────────────────────────────────────────────────
@@ -165,6 +169,21 @@ export interface AssessmentKey {
  * Written ONLY by the gradeAttempt Cloud Function via admin SDK.
  * Learners may read their own; admins read all.
  */
+/**
+ * certificates/{certId}
+ * Written ONLY by the certificate Cloud Functions via admin SDK.
+ * Single-doc reads are PUBLIC (the /verify/[certId] page); list queries are
+ * restricted to admins or the owning learner.
+ */
+export interface Certificate {
+  certId: string;
+  userId: string;
+  learnerName: string;
+  courseId: string;
+  courseTitle: string;
+  issuedAt: Timestamp;
+}
+
 export interface Attempt {
   userId: string;
   assessmentId: string;

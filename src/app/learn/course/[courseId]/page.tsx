@@ -7,8 +7,10 @@ import {
   doc, getDoc, collection, getDocs, query, orderBy, where
 } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import functions from "@/lib/firebase/functions";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Course, CourseModule, Lesson, Enrollment, LessonProgress, Assessment, Attempt } from "@/types";
+import type { Course, CourseModule, Lesson, Enrollment, LessonProgress, Assessment, Attempt, Certificate } from "@/types";
 import LearnerShell from "@/components/layout/LearnerShell";
 import { Spinner } from "@/components/ui/Spinner";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -36,6 +38,11 @@ export default function CoursePage() {
   const [postAttempt, setPostAttempt] = useState<Attempt | null>(null);
   // Which assessment panel is expanded
   const [showingAssessment, setShowingAssessment] = useState<"pre" | "post" | null>(null);
+
+  // Phase 3: certificate state
+  const [certificate, setCertificate] = useState<Certificate | null>(null);
+  const [certLoading, setCertLoading] = useState(false);
+  const [certError, setCertError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!appUser) return;
@@ -152,6 +159,16 @@ export default function CoursePage() {
             setPostAttempt(sorted[0]);
           }
         }
+
+        // Phase 3: existing certificate for this course (auto-issued or on-demand)
+        const certSnap = await getDocs(
+          query(
+            collection(db, "certificates"),
+            where("userId", "==", appUser.uid),
+            where("courseId", "==", courseId)
+          )
+        );
+        if (!certSnap.empty) setCertificate(certSnap.docs[0].data() as Certificate);
       } catch (err: unknown) {
         console.error("CoursePage load failed:", err);
         setLoadError(err instanceof Error ? err.message : "Failed to load course. Please try again.");
@@ -206,6 +223,40 @@ export default function CoursePage() {
   const firstLesson = Object.values(lessonMap).flat()[0];
   const progressPct = enrollment?.progressPct ?? 0;
   const courseComplete = progressPct >= 100;
+  // Certificate is available once lessons are done AND (no post-assessment OR it's passed)
+  const certEligible = courseComplete && (!postAssessment || !!postAttempt?.passed);
+
+  const handleGetCertificate = async () => {
+    setCertLoading(true);
+    setCertError(null);
+    try {
+      const fn = httpsCallable<{ courseId: string }, { certId: string; downloadUrl: string }>(
+        functions,
+        "issueCertificate"
+      );
+      const { data } = await fn({ courseId });
+      window.open(data.downloadUrl, "_blank", "noopener");
+      if (!certificate) {
+        setCertificate({
+          certId: data.certId,
+          userId: appUser!.uid,
+          learnerName: appUser!.name,
+          courseId,
+          courseTitle: course?.title ?? "",
+          issuedAt: null as unknown as Certificate["issuedAt"],
+        });
+      }
+    } catch (err: unknown) {
+      console.error("issueCertificate failed:", err);
+      setCertError(
+        err instanceof Error && err.message.includes("failed-precondition")
+          ? err.message
+          : "Could not issue your certificate. Please try again."
+      );
+    } finally {
+      setCertLoading(false);
+    }
+  };
 
   return (
     <LearnerShell>
@@ -372,6 +423,51 @@ export default function CoursePage() {
                 />
               </div>
             )}
+          </div>
+        )}
+
+        {/* Phase 3: Certificate card */}
+        {(certEligible || certificate) && (
+          <div
+            className="card mb-6 flex flex-col sm:flex-row sm:items-center gap-4"
+            style={{ borderLeft: "4px solid #8FB85C", backgroundColor: "#FBFDF9" }}
+          >
+            <div className="flex-1">
+              <span className="kicker text-xs" style={{ color: "#2C7A6B" }}>CERTIFICATE</span>
+              <h3 className="font-semibold text-sm mt-0.5" style={{ color: "#13403A" }}>
+                {certificate
+                  ? "Your certificate has been issued 🎓"
+                  : "You've earned your certificate 🎓"}
+              </h3>
+              <p className="text-xs mt-1" style={{ color: "#5E6E69" }}>
+                {certificate ? (
+                  <>
+                    ID: <span className="font-mono font-semibold">{certificate.certId}</span>
+                    {" · "}
+                    <a
+                      href={`/verify/${certificate.certId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline"
+                    >
+                      public verification link
+                    </a>
+                    {" · "}a copy was emailed to you
+                  </>
+                ) : (
+                  "Download your branded PDF — it will also be emailed to you."
+                )}
+              </p>
+              {certError && <p className="text-xs mt-1" style={{ color: "#B91C1C" }}>{certError}</p>}
+            </div>
+            <button
+              onClick={handleGetCertificate}
+              disabled={certLoading}
+              className="btn-primary text-sm flex-shrink-0"
+              style={{ opacity: certLoading ? 0.7 : 1 }}
+            >
+              {certLoading ? "Preparing…" : certificate ? "Download PDF" : "Get my certificate"}
+            </button>
           </div>
         )}
 

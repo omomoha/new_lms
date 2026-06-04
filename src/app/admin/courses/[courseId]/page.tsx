@@ -21,8 +21,11 @@ import {
   arrayUnion,
   arrayRemove,
   where,
+  deleteField,
 } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import functions from "@/lib/firebase/functions";
 import { videoService } from "@/lib/video";
 import { uploadResource, ACCEPT_BY_TYPE } from "@/lib/files";
 import type { Course, CourseModule, Lesson, LessonType, Cohort, Assessment, AssessmentKind } from "@/types";
@@ -64,6 +67,17 @@ export default function CourseBuilderPage() {
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const resourceFileRef = useRef<HTMLInputElement>(null);
+
+  // Phase 3: captions + transcript for video lessons
+  const [captionsFile, setCaptionsFile] = useState<File | null>(null);
+  const [transcriptInput, setTranscriptInput] = useState("");
+  const captionsFileRef = useRef<HTMLInputElement>(null);
+
+  // Phase 3: certificate template
+  const certTemplateRef = useRef<HTMLInputElement>(null);
+  const [certUploading, setCertUploading] = useState(false);
+  const [certPreviewing, setCertPreviewing] = useState(false);
+  const [certError, setCertError] = useState<string | null>(null);
 
   // Quiz editor: shown after a quiz lesson is created (or for editing)
   // key = lessonId, value = assessment or null if not yet created
@@ -192,6 +206,13 @@ export default function CourseBuilderPage() {
         }
       }
 
+      // Phase 3: optional captions (.vtt) upload for video lessons
+      let captionsPath: string | undefined;
+      if (lessonType === "video" && captionsFile) {
+        const cPath = `captions/${courseId}/${moduleId}/${Date.now()}_${captionsFile.name}`;
+        captionsPath = await uploadResource(captionsFile, cPath);
+      }
+
       let filePath: string | undefined;
       if ((lessonType === "slides" || lessonType === "doc" || lessonType === "lab") && resourceFile) {
         const path = `resources/${courseId}/${moduleId}/${Date.now()}_${resourceFile.name}`;
@@ -208,6 +229,10 @@ export default function CourseBuilderPage() {
         ...(videoPath ? { videoPath } : {}),
         ...(videoUrl ? { videoUrl } : {}),
         ...(filePath ? { filePath } : {}),
+        ...(captionsPath ? { captionsPath } : {}),
+        ...(lessonType === "video" && transcriptInput.trim()
+          ? { transcript: transcriptInput.trim() }
+          : {}),
         ...(lessonType === "text" ? { textContent: lessonText } : {}),
       };
 
@@ -225,7 +250,7 @@ export default function CourseBuilderPage() {
       });
 
       const createdLessonId = ref.id;
-      setLessonTitle(""); setLessonText(""); setVideoFile(null); setVideoUrlInput(""); setVideoUrlError(null); setResourceFile(null);
+      setLessonTitle(""); setLessonText(""); setVideoFile(null); setVideoUrlInput(""); setVideoUrlError(null); setResourceFile(null); setCaptionsFile(null); setTranscriptInput("");
       setAddingLessonTo(null);
 
       // If quiz type, automatically open the quiz editor for the new lesson
@@ -269,6 +294,78 @@ export default function CourseBuilderPage() {
       });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to update cohort access");
+    }
+  };
+
+  // ── Phase 3: certificate template handlers ────────────────────────────────
+
+  const handleCertTemplateUpload = async (file: File) => {
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith(".png") && !lower.endsWith(".jpg") && !lower.endsWith(".jpeg")) {
+      setCertError("Template must be a PNG or JPG image (A4 landscape, e.g. 2526×1785 px).");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setCertError("Image must be under 5 MB.");
+      return;
+    }
+    setCertUploading(true);
+    setCertError(null);
+    try {
+      const ext = lower.split(".").pop();
+      const path = `certTemplates/${courseId}_${Date.now()}.${ext}`;
+      const storedPath = await uploadResource(file, path);
+      await updateDoc(doc(db, "courses", courseId), {
+        certTemplatePath: storedPath,
+        certTemplateTextColor: course?.certTemplateTextColor ?? "dark",
+      });
+      setCourse((prev) => prev ? { ...prev, certTemplatePath: storedPath } : prev);
+    } catch (err: unknown) {
+      setCertError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setCertUploading(false);
+    }
+  };
+
+  const handleCertTextColor = async (color: "dark" | "light") => {
+    try {
+      await updateDoc(doc(db, "courses", courseId), { certTemplateTextColor: color });
+      setCourse((prev) => prev ? { ...prev, certTemplateTextColor: color } : prev);
+    } catch (err: unknown) {
+      setCertError(err instanceof Error ? err.message : "Failed to save");
+    }
+  };
+
+  const handleCertTemplateRemove = async () => {
+    try {
+      await updateDoc(doc(db, "courses", courseId), {
+        certTemplatePath: deleteField(),
+        certTemplateTextColor: deleteField(),
+      });
+      setCourse((prev) => {
+        if (!prev) return prev;
+        const next = { ...prev };
+        delete next.certTemplatePath;
+        delete next.certTemplateTextColor;
+        return next;
+      });
+    } catch (err: unknown) {
+      setCertError(err instanceof Error ? err.message : "Failed to remove");
+    }
+  };
+
+  const handleCertPreview = async () => {
+    setCertPreviewing(true);
+    setCertError(null);
+    try {
+      const fn = httpsCallable<{ courseId: string }, { url: string }>(functions, "previewCertificate");
+      const { data } = await fn({ courseId });
+      window.open(data.url, "_blank", "noopener");
+    } catch (err: unknown) {
+      console.error("previewCertificate failed:", err);
+      setCertError("Preview failed — is the functions deploy up to date?");
+    } finally {
+      setCertPreviewing(false);
     }
   };
 
@@ -464,6 +561,74 @@ export default function CourseBuilderPage() {
         </div>
       </div>
 
+      {/* Phase 3: Certificate template */}
+      <div className="card mb-4">
+        <h2 className="font-medium mb-1" style={{ color: "#1E302C" }}>Certificate</h2>
+        <p className="text-xs mb-3" style={{ color: "#5E6E69" }}>
+          Certificates are issued and emailed automatically when a learner completes the
+          course (and passes the post-assessment, if one exists). By default they use the
+          built-in Andela design — or upload your own background below. Use an A4-landscape
+          PNG/JPG and keep the centre clear: the learner&apos;s name, course title, date, ID
+          and verification link are overlaid automatically.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={certTemplateRef}
+            type="file"
+            accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleCertTemplateUpload(f);
+              e.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            disabled={certUploading}
+            onClick={() => certTemplateRef.current?.click()}
+            className="btn-secondary text-xs"
+          >
+            {certUploading
+              ? "Uploading…"
+              : course.certTemplatePath
+              ? "Replace custom template"
+              : "Upload custom template (PNG/JPG)"}
+          </button>
+          {course.certTemplatePath && (
+            <>
+              <label className="text-xs flex items-center gap-1.5" style={{ color: "#5E6E69" }}>
+                Overlay text:
+                <select
+                  className="input-field text-xs !py-1 !w-auto"
+                  value={course.certTemplateTextColor ?? "dark"}
+                  onChange={(e) => handleCertTextColor(e.target.value as "dark" | "light")}
+                >
+                  <option value="dark">Dark (light background)</option>
+                  <option value="light">Light (dark background)</option>
+                </select>
+              </label>
+              <button type="button" onClick={handleCertTemplateRemove} className="btn-secondary text-xs">
+                Remove (use built-in design)
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            disabled={certPreviewing}
+            onClick={handleCertPreview}
+            className="btn-primary text-xs"
+          >
+            {certPreviewing ? "Generating…" : "Preview sample PDF"}
+          </button>
+          <Badge
+            label={course.certTemplatePath ? "custom template" : "built-in design"}
+            variant={course.certTemplatePath ? "success" : "warning"}
+          />
+        </div>
+        {certError && <p className="text-xs mt-2 text-red-600">{certError}</p>}
+      </div>
+
       {/* Modules */}
       <div className="space-y-4">
         {modules.map((mod) => (
@@ -592,6 +757,34 @@ export default function CourseBuilderPage() {
                           {videoUrlError && (
                             <p className="mt-1 text-xs text-red-600">{videoUrlError}</p>
                           )}
+                        </div>
+                      )}
+
+                      {/* Phase 3: captions + transcript (uploaded videos only) */}
+                      {videoFile && (
+                        <div className="space-y-2 pt-1 border-t" style={{ borderColor: "#DDE6DF" }}>
+                          <input
+                            ref={captionsFileRef}
+                            type="file"
+                            accept=".vtt,text/vtt"
+                            className="hidden"
+                            onChange={(e) => setCaptionsFile(e.target.files?.[0] ?? null)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => captionsFileRef.current?.click()}
+                            className="btn-secondary text-xs"
+                          >
+                            {captionsFile ? `Captions: ${captionsFile.name}` : "Add captions (.vtt) — optional"}
+                          </button>
+                          <textarea
+                            className="input-field resize-none text-xs"
+                            rows={3}
+                            placeholder="Transcript (optional) — shown below the video for accessibility"
+                            value={transcriptInput}
+                            onChange={(e) => setTranscriptInput(e.target.value)}
+                            aria-label="Video transcript"
+                          />
                         </div>
                       )}
                     </div>

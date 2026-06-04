@@ -15,7 +15,8 @@
   "dependencies": {
     "firebase-admin": "^13.0.0",
     "firebase-functions": "^6.0.0",
-    "mammoth": "^1.8.0"
+    "mammoth": "^1.8.0",
+    "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "typescript": "^5.5.3",

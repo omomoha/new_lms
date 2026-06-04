@@ -15,17 +15,37 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Videos — authenticated read; admin write
+    // Videos — Phase 3 hardening: NO direct client reads (admin excepted).
+    // Learners obtain short-lived V4 signed URLs from the getSignedVideoUrl
+    // Cloud Function, which enforces cohort/enrollment access server-side.
+    // Signed URLs bypass these rules by design; removing the blanket
+    // authenticated read kills the old long-lived download-token URLs.
     match /videos/{courseId}/{allPaths=**} {
-      // All authenticated users can stream/download videos.
-      // (Firestore rules already gate which courses a learner can access —
-      //  the storage rule is a second layer ensuring unauthenticated users
-      //  cannot hot-link video URLs.)
-      allow read: if request.auth != null;
+      allow read: if request.auth != null
+        && request.auth.token.role == "admin";
 
       // Only admins (custom claim) may upload, update, or delete videos.
       allow write: if request.auth != null
         && request.auth.token.role == "admin";
+    }
+
+    // Captions (.vtt) — authenticated read; admin write (Phase 3)
+    match /captions/{courseId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.auth.token.role == "admin";
+    }
+
+    // Certificate templates — admin only (Phase 3)
+    match /certTemplates/{allPaths=**} {
+      allow read, write: if request.auth != null
+        && request.auth.token.role == "admin";
+    }
+
+    // Issued certificate PDFs — functions only (Phase 3).
+    // Learners receive short-lived signed URLs; no direct client access.
+    match /certificates/{allPaths=**} {
+      allow read, write: if false;
     }
 
     // Resources (slides / doc / lab files) — authenticated read; admin write

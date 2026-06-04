@@ -9,3 +9,10 @@ export { weeklyDigest } from "./weeklyDigest";
 export { dailySignupAlert } from "./dailySignupAlert";
 export { syncRoleClaim } from "./syncRoleClaim";
 export { parseAssessmentDoc } from "./parseAssessmentDoc";
+export { getSignedVideoUrl } from "./getSignedVideoUrl";
+export {
+  issueCertificate,
+  autoIssueCertificate,
+  autoIssueOnPostPass,
+  previewCertificate,
+} from "./certificates";

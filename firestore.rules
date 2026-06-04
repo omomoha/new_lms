@@ -173,5 +173,26 @@ service cloud.firestore {
         || (isAuthed() && attemptId.matches(request.auth.uid + "_.*"));
       allow write: if false; // gradeAttempt function only via admin SDK
     }
+
+    // ── certificates/{certId} ───────────────────────────────────────────────
+    // Phase 3. Written ONLY by the certificate Cloud Functions via admin SDK.
+    // Single-doc GET is PUBLIC — the /verify/[certId] page works without
+    // sign-in (a certificate is a deliberately shareable artifact).
+    // LIST queries are restricted: admins see all; a learner may only list
+    // their own (queries must filter userId == their uid to be provable).
+    match /certificates/{certId} {
+      allow get: if true;
+      allow list: if isAdmin()
+        || (isAuthed() && resource.data.userId == request.auth.uid);
+      allow write: if false; // certificate functions only via admin SDK
+    }
+
+    // ── settings/{id} ───────────────────────────────────────────────────────
+    // Phase 3. Global app settings (e.g. settings/certificate holds the
+    // default certificate template). Admin-managed; functions read via
+    // admin SDK.
+    match /settings/{settingId} {
+      allow read, write: if isAdmin();
+    }
   }
 }

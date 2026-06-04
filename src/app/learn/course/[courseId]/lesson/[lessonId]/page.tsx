@@ -407,14 +407,33 @@ export default function LessonPage() {
             })()
           ) : lesson.type === "video" && lesson.videoPath && appUser ? (
             allLessonIds.length > 0 && (
-              <VideoPlayer
-                userId={appUser.uid}
-                courseId={courseId}
-                lessonId={lessonId}
-                videoPath={lesson.videoPath}
-                allLessonIds={allLessonIds}
-                onComplete={handleLessonComplete}
-              />
+              <>
+                <VideoPlayer
+                  userId={appUser.uid}
+                  courseId={courseId}
+                  lessonId={lessonId}
+                  videoPath={lesson.videoPath}
+                  allLessonIds={allLessonIds}
+                  captionsPath={lesson.captionsPath}
+                  onComplete={handleLessonComplete}
+                />
+                {lesson.transcript && (
+                  <details className="mt-4 card">
+                    <summary
+                      className="cursor-pointer text-sm font-semibold select-none"
+                      style={{ color: "#13403A" }}
+                    >
+                      Transcript
+                    </summary>
+                    <div
+                      className="mt-3 text-sm whitespace-pre-wrap leading-relaxed"
+                      style={{ color: "#1E302C" }}
+                    >
+                      {lesson.transcript}
+                    </div>
+                  </details>
+                )}
+              </>
             )
           ) : lesson.type === "video" && !lesson.videoPath && !lesson.videoUrl ? (
             <div className="w-full aspect-video rounded-xl flex items-center justify-center" style={{ backgroundColor: "#E7F1DE", color: "#5E6E69" }}>

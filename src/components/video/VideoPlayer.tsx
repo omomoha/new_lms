@@ -20,6 +20,7 @@ import {
 } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
 import { videoService } from "@/lib/video";
+import { getResourceUrl } from "@/lib/files";
 import { shouldSaveProgress, calcProgressPct } from "@/lib/progress";
 import type { LessonProgress } from "@/types";
 
@@ -29,6 +30,7 @@ interface VideoPlayerProps {
   lessonId: string;
   videoPath: string;        // Firebase Storage path
   allLessonIds: string[];   // for progressPct calc
+  captionsPath?: string;    // Phase 3: Storage path to a WebVTT (.vtt) captions file
   onComplete?: () => void;
 }
 
@@ -38,11 +40,13 @@ export function VideoPlayer({
   lessonId,
   videoPath,
   allLessonIds,
+  captionsPath,
   onComplete,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [urlError, setUrlError] = useState<string | null>(null);
+  const [captionsUrl, setCaptionsUrl] = useState<string | null>(null);
   const [completed, setCompleted] = useState(false);
   const completedRef = useRef(false); // Fix #1/#2: authoritative ref for race-free completion check
   const lastSavedAt = useRef<number>(0);
@@ -77,6 +81,32 @@ export function VideoPlayer({
     })();
     return () => { cancelled = true; };
   }, [videoPath, progressDocId]);
+
+  // Phase 3: load captions as a same-origin blob URL.
+  // Browsers fetch <track> sources in CORS mode; converting the VTT file to a
+  // blob URL sidesteps cross-origin restrictions for any storage backend.
+  useEffect(() => {
+    if (!captionsPath) { setCaptionsUrl(null); return; }
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    (async () => {
+      try {
+        const remoteUrl = await getResourceUrl(captionsPath);
+        const res = await fetch(remoteUrl);
+        if (!res.ok) throw new Error(`captions fetch failed: ${res.status}`);
+        const text = await res.text();
+        objectUrl = URL.createObjectURL(new Blob([text], { type: "text/vtt" }));
+        if (!cancelled) setCaptionsUrl(objectUrl);
+      } catch (err) {
+        console.error("Captions failed to load:", err);
+        if (!cancelled) setCaptionsUrl(null); // video still plays without captions
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [captionsPath]);
 
   const saveProgress = useCallback(
     async (position: number, force = false) => {
@@ -209,7 +239,17 @@ export function VideoPlayer({
           // Fix #4: removed dead `const duration = ...` line
           handleMarkComplete();
         }}
-      />
+      >
+        {captionsUrl && (
+          <track
+            kind="captions"
+            src={captionsUrl}
+            srcLang="en"
+            label="English"
+            default
+          />
+        )}
+      </video>
       {/* Fix #3: inline save-error message */}
       {saveError && (
         <p className="mt-2 text-xs text-red-600">{saveError}</p>
