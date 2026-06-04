@@ -13,7 +13,7 @@ import {
   doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, where, serverTimestamp
 } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
-import { getResourceUrl, isPdf, isTextDoc } from "@/lib/files";
+import DocumentViewer from "@/components/lessons/DocumentViewer";
 import { calcProgressPct } from "@/lib/progress";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Course, CourseModule, Lesson, LessonProgress, Enrollment, Assessment, Attempt } from "@/types";
@@ -42,10 +42,7 @@ export default function LessonPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Document / slides viewer state
-  const [resourceUrl, setResourceUrl] = useState<string | null>(null);
-  const [resourceText, setResourceText] = useState<string | null>(null); // .md/.txt rendered natively
-  const [resourceError, setResourceError] = useState<string | null>(null);
+  // Document / slides viewer state (rendering itself lives in DocumentViewer)
   const [showTranscript, setShowTranscript] = useState(false);
   const [docCompleted, setDocCompleted] = useState(false);
   const [markingComplete, setMarkingComplete] = useState(false);
@@ -151,43 +148,22 @@ export default function LessonPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Resolve resource URL for slides/doc/lab lesson types
+  // Load completion state for document-type lessons (rendering is handled by
+  // DocumentViewer, which resolves the file itself).
   useEffect(() => {
-    if (!lesson) return;
+    if (!lesson || !appUser) return;
     const needsResource = lesson.type === "slides" || lesson.type === "doc" || lesson.type === "lab";
     if (!needsResource) return;
 
     let cancelled = false;
-    setResourceUrl(null);
-    setResourceText(null);
-    setResourceError(null);
-
     (async () => {
       try {
-        if (lesson.filePath) {
-          const url = await getResourceUrl(lesson.filePath);
-          if (cancelled) return;
-          setResourceUrl(url);
-          // Markdown / plain-text docs: fetch and render natively (Office
-          // Online cannot preview them and would show "File not found").
-          if (isTextDoc(lesson.filePath)) {
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(`doc fetch failed: ${res.status}`);
-            const text = await res.text();
-            if (!cancelled) setResourceText(text);
-          }
-        } else if (lesson.fileUrl) {
-          if (!cancelled) setResourceUrl(lesson.fileUrl);
-        }
-        if (appUser) {
-          const snap = await getDoc(doc(db, "progress", `${appUser.uid}_${lesson.id}`));
-          if (!cancelled && snap.exists()) {
-            const p = snap.data() as LessonProgress;
-            if (p.completedAt) setDocCompleted(true);
-          }
+        const snap = await getDoc(doc(db, "progress", `${appUser.uid}_${lesson.id}`));
+        if (!cancelled && snap.exists()) {
+          const p = snap.data() as LessonProgress;
+          if (p.completedAt) setDocCompleted(true);
         }
       } catch (err: unknown) {
-        if (!cancelled) setResourceError("Unable to load resource. Check your connection.");
         console.error(err);
       }
     })();
@@ -500,51 +476,13 @@ export default function LessonPage() {
           ) : /* ── Slides / Doc / Lab with resource file ───────────────────── */
           (lesson.type === "slides" || lesson.type === "doc" || lesson.type === "lab") ? (
             <div className="space-y-4">
-              {/* Downloads are disabled for learners — content is view-only. */}
-              {resourceError ? (
-                <div className="card py-10 text-center text-sm" style={{ color: "#5E6E69" }}>
-                  {resourceError}
-                </div>
-              ) : !resourceUrl ? (
-                lesson.filePath || lesson.fileUrl ? (
-                  <div className="w-full rounded-xl flex items-center justify-center" style={{ height: "70vh", backgroundColor: "#E7F1DE" }}>
-                    <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#8FB85C" }} />
-                  </div>
-                ) : (
-                  <div className="card text-center py-12" style={{ color: "#5E6E69" }}>
-                    <p className="text-sm">File not yet uploaded for this lesson.</p>
-                  </div>
-                )
-              ) : isTextDoc(lesson.filePath ?? lesson.fileUrl ?? "") ? (
-                /* Markdown / plain-text docs render natively */
-                resourceText !== null ? (
-                  <TextLessonContent content={resourceText} />
-                ) : (
-                  <div className="w-full rounded-xl flex items-center justify-center" style={{ height: "40vh", backgroundColor: "#E7F1DE" }}>
-                    <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#8FB85C" }} />
-                  </div>
-                )
-              ) : isPdf(lesson.filePath ?? lesson.fileUrl ?? "") ? (
-                <iframe
-                  src={`${resourceUrl}#toolbar=0&navpanes=0`}
-                  title={lesson.title}
-                  className="w-full rounded-xl border"
-                  style={{ height: "70vh", borderColor: "#DDE6DF" }}
-                />
-              ) : (
-                <>
-                  <iframe
-                    src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(resourceUrl)}`}
-                    title={lesson.title}
-                    className="w-full rounded-xl border"
-                    style={{ height: "70vh", borderColor: "#DDE6DF" }}
-                    allowFullScreen
-                  />
-                  <p className="text-xs mt-1" style={{ color: "#5E6E69" }}>
-                    Preview rendered via Microsoft Office Online.
-                  </p>
-                </>
-              )}
+              {/* Unified interactive viewer (md/txt/docx native; pdf inline;
+                  pptx/ppt/doc via Office embed). Downloads disabled. */}
+              <DocumentViewer
+                filePath={lesson.filePath}
+                fileUrl={lesson.fileUrl}
+                title={lesson.title}
+              />
 
               <NonVideoCompleteButton
                 completed={docCompleted}

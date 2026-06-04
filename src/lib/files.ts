@@ -92,6 +92,25 @@ export function isTextDoc(filename: string): boolean {
   return clean.endsWith(".md") || clean.endsWith(".markdown") || clean.endsWith(".txt");
 }
 
+/**
+ * How the DocumentViewer should render a file:
+ *  - "text"   → fetch + interactive native renderer (md, markdown, txt)
+ *  - "docx"   → client-side DOCX→HTML (mammoth) + interactive native renderer
+ *  - "pdf"    → inline browser PDF viewer (toolbar hidden)
+ *  - "office" → Microsoft Office Online embed (pptx, ppt, legacy doc, xlsx…)
+ */
+export type DocRenderKind = "text" | "docx" | "pdf" | "office";
+
+export function getDocRenderKind(filename: string): DocRenderKind {
+  const clean = (() => {
+    try { return new URL(filename).pathname; } catch { return filename.split("?")[0]; }
+  })().toLowerCase();
+  if (clean.endsWith(".md") || clean.endsWith(".markdown") || clean.endsWith(".txt")) return "text";
+  if (clean.endsWith(".docx")) return "docx";
+  if (clean.endsWith(".pdf")) return "pdf";
+  return "office";
+}
+
 /** Return true if the path/URL points to a PDF file.
  *  Strips query strings and fragments before checking the extension. */
 export function isPdf(filename: string): boolean {
