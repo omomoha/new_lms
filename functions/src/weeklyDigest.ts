@@ -16,6 +16,7 @@
 
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
+import { postToSlack } from "./notify";
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -210,6 +211,18 @@ export const weeklyDigest = onSchedule(
       });
     }
     await batch.commit();
+
+    // Post a compact one-line summary to Slack
+    const completionRate =
+      stats.totalEnrollments > 0
+        ? Math.round((stats.completedEnrollments / stats.totalEnrollments) * 100) + "%"
+        : "—";
+    await postToSlack(
+      `📊 Andela LMS weekly digest (${generatedAt}): ` +
+        `${stats.totalUsers} users | +${stats.newUsersLast7Days} new | ` +
+        `${stats.totalEnrollments} enrollments | ${completionRate} completion | ` +
+        `${stats.attemptsLast7Days} attempts this week`
+    );
 
     console.info(
       `weeklyDigest: sent digest to ${adminSnap.size} admin(s). Stats:`,

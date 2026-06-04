@@ -189,6 +189,30 @@ as a fallback for immediate UI rendering.
 
 ---
 
+## Maintenance
+
+### June 2025 dependency upgrades
+
+| Package | Old | New |
+|---|---|---|
+| `next` (root) | 14.2.5 | 14.2.35 |
+| `eslint-config-next` (root) | 14.2.5 | 14.2.35 |
+| `firebase-functions` (functions/) | ^5.0.1 | ^6.0.0 |
+| `firebase-admin` (functions/) | ^12.2.0 | ^13.0.0 |
+| Node runtime (functions engine) | 20 | 22 |
+| CI runner node-version | 20 | 22 |
+
+After pulling these changes you **must** run `npm install` in both the root and the functions directory:
+
+```bash
+npm install
+cd functions && npm install && cd ..
+```
+
+The `next` bump stays on the 14.2.x patch line (security fixes only — no breaking changes). The `firebase-functions` v6 and `firebase-admin` v13 upgrades are compatible with all existing code: all Cloud Functions already use the stable `firebase-functions/v2/*` modular imports and no v1 `functions.` namespace is used anywhere.
+
+---
+
 ## Firebase Trigger Email Extension
 
 Credentials emails written to the `mail/` Firestore collection are delivered by the
