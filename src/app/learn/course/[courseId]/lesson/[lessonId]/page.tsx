@@ -70,17 +70,19 @@ export default function LessonPage() {
       const mods = modSnap.docs.map((d) => ({ id: d.id, ...d.data() } as CourseModule));
       setModules(mods);
 
+      // Perf: fetch every module's lessons in PARALLEL (was a serial waterfall —
+      // each module added a full network round-trip to page load).
       const lMap: Record<string, Lesson[]> = {};
-      let foundLesson: Lesson | null = null;
-      for (const mod of mods) {
-        const lSnap = await getDocs(
-          query(collection(db, "courses", courseId, "modules", mod.id, "lessons"), orderBy("order"))
-        );
-        const lessons = lSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Lesson));
-        lMap[mod.id] = lessons;
-        const match = lessons.find((l) => l.id === lessonId);
-        if (match) foundLesson = match;
-      }
+      await Promise.all(
+        mods.map(async (mod) => {
+          const lSnap = await getDocs(
+            query(collection(db, "courses", courseId, "modules", mod.id, "lessons"), orderBy("order"))
+          );
+          lMap[mod.id] = lSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Lesson));
+        })
+      );
+      const foundLesson: Lesson | null =
+        Object.values(lMap).flat().find((l) => l.id === lessonId) ?? null;
       setLessonMap(lMap);
       setLesson(foundLesson);
 

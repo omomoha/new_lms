@@ -1,0 +1,12 @@
+[
+  {
+    "origin": [
+      "https://andela-lms-dae5f.web.app",
+      "https://andela-lms-dae5f.firebaseapp.com",
+      "http://localhost:3000"
+    ],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Content-Type", "Content-Length", "Content-Range"],
+    "maxAgeSeconds": 3600
+  }
+]

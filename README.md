@@ -48,6 +48,20 @@ An internal Learning Management System built on Next.js 14 + Firebase, developed
 
 5. Deploy indexes + rules with everything else: `firebase deploy` (CI does this on push).
 
+6. **Storage CORS (required for the document viewer + captions)** — browsers block
+   `fetch()` of Storage files from the app origin until the bucket has a CORS policy
+   (media tags like `<video>`/`<iframe>` work without it, which is why videos played
+   while documents failed). One-time:
+
+   ```bash
+   gcloud storage buckets update gs://andela-lms-dae5f.firebasestorage.app \
+     --cors-file=cors.json --project=andela-lms-dae5f
+   # If your default bucket is the older style, use gs://andela-lms-dae5f.appspot.com
+   # (check: Firebase console → Storage → bucket name shown at the top)
+   ```
+
+   `cors.json` lives in the repo root and allows GET from the app domains + localhost.
+
 ---
 
 ## Phase 1 Scope (this repo)

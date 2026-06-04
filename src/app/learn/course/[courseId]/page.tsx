@@ -74,13 +74,16 @@ export default function CoursePage() {
         }
         setModules(mods);
 
+        // Perf: fetch every module's lessons in PARALLEL (was a serial waterfall)
         const lMap: Record<string, Lesson[]> = {};
-        for (const mod of mods) {
-          const lSnap = await getDocs(
-            query(collection(db, "courses", courseId, "modules", mod.id, "lessons"), orderBy("order"))
-          );
-          lMap[mod.id] = lSnap.docs.map((d) => d.data() as Lesson);
-        }
+        await Promise.all(
+          mods.map(async (mod) => {
+            const lSnap = await getDocs(
+              query(collection(db, "courses", courseId, "modules", mod.id, "lessons"), orderBy("order"))
+            );
+            lMap[mod.id] = lSnap.docs.map((d) => d.data() as Lesson);
+          })
+        );
         setLessonMap(lMap);
 
         // Fetch enrollment

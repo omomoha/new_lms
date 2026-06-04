@@ -70,26 +70,34 @@ function newCertId(): string {
 interface TemplateConfig {
   templatePath: string | null; // Storage path to PNG/JPG background, or null = built-in
   textColor: "dark" | "light";
+  signaturePath: string | null;   // Storage path to a PNG/JPG signature image
+  signatoryName: string | null;   // e.g. "Jane Doe"
+  signatoryTitle: string | null;  // e.g. "Director of Learning, Andela"
 }
 
 async function resolveTemplate(courseId: string): Promise<TemplateConfig> {
   const courseSnap = await db.doc(`courses/${courseId}`).get();
   const course = courseSnap.data() ?? {};
-  if (typeof course.certTemplatePath === "string" && course.certTemplatePath) {
-    return {
-      templatePath: course.certTemplatePath,
-      textColor: course.certTemplateTextColor === "light" ? "light" : "dark",
-    };
-  }
   const settingsSnap = await db.doc("settings/certificate").get();
   const settings = settingsSnap.data() ?? {};
-  if (typeof settings.templatePath === "string" && settings.templatePath) {
-    return {
-      templatePath: settings.templatePath,
-      textColor: settings.textColor === "light" ? "light" : "dark",
-    };
-  }
-  return { templatePath: null, textColor: "dark" };
+
+  const str = (v: unknown): string | null =>
+    typeof v === "string" && v.trim() ? v.trim() : null;
+
+  // Course-level values win; global settings fill the gaps.
+  const templatePath = str(course.certTemplatePath) ?? str(settings.templatePath);
+  const textColor =
+    (str(course.certTemplatePath) ? course.certTemplateTextColor : settings.textColor) === "light"
+      ? ("light" as const)
+      : ("dark" as const);
+
+  return {
+    templatePath,
+    textColor,
+    signaturePath: str(course.certSignaturePath) ?? str(settings.signaturePath),
+    signatoryName: str(course.certSignatoryName) ?? str(settings.signatoryName),
+    signatoryTitle: str(course.certSignatoryTitle) ?? str(settings.signatoryTitle),
+  };
 }
 
 // ── PDF builder ──────────────────────────────────────────────────────────────
@@ -100,6 +108,8 @@ interface CertContent {
   certId: string;
   issuedDate: string;
   verifyUrl: string;
+  /** Preview renders a SAMPLE watermark note instead of a verify link. */
+  isPreview?: boolean;
 }
 
 function fitSize(font: PDFFont, text: string, startSize: number, maxWidth: number, minSize: number): number {
@@ -194,16 +204,59 @@ async function buildCertificatePdf(
     y: height - 335, size: courseSize, font: serif, color: body,
   });
 
+  // ── Signature block (admin-configured; bottom-left, above the footer) ──
+  if (template.signaturePath || template.signatoryName) {
+    const sigX = 80;
+    let lineY = 128;
+    if (template.signaturePath) {
+      try {
+        const [sigBytes] = await admin.storage().bucket().file(template.signaturePath).download();
+        const sigLower = template.signaturePath.toLowerCase();
+        const sigImg =
+          sigLower.endsWith(".png")
+            ? await pdf.embedPng(sigBytes)
+            : await pdf.embedJpg(sigBytes);
+        // Fit into a 150×45 box, anchored just above the signature line
+        const scale = Math.min(150 / sigImg.width, 45 / sigImg.height);
+        const w = sigImg.width * scale;
+        const h = sigImg.height * scale;
+        page.drawImage(sigImg, { x: sigX, y: lineY + 4, width: w, height: h });
+      } catch (err) {
+        console.error("certificate signature image failed to load (skipping):", err);
+      }
+    }
+    page.drawLine({
+      start: { x: sigX, y: lineY },
+      end: { x: sigX + 170, y: lineY },
+      thickness: 0.8,
+      color: muted,
+    });
+    if (template.signatoryName) {
+      page.drawText(template.signatoryName, {
+        x: sigX, y: lineY - 14, size: 11, font: sansBold, color: body,
+      });
+    }
+    if (template.signatoryTitle) {
+      page.drawText(template.signatoryTitle, {
+        x: sigX, y: lineY - 27, size: 9, font: sans, color: muted,
+      });
+    }
+  }
+
   // Footer: date | cert id | verify URL
   page.drawText(`Issued: ${content.issuedDate}`, { x: 64, y: 76, size: 10, font: sans, color: muted });
 
-  const idLabel = `Certificate ID: ${content.certId}`;
+  const idLabel = content.isPreview
+    ? "SAMPLE PREVIEW — not a real certificate"
+    : `Certificate ID: ${content.certId}`;
   page.drawText(idLabel, {
     x: cx - sansBold.widthOfTextAtSize(idLabel, 10) / 2,
     y: 76, size: 10, font: sansBold, color: primary,
   });
 
-  const verifyLabel = `Verify: ${content.verifyUrl}`;
+  const verifyLabel = content.isPreview
+    ? "Real certificates carry a working verification link here"
+    : `Verify: ${content.verifyUrl}`;
   page.drawText(verifyLabel, {
     x: width - 64 - sans.widthOfTextAtSize(verifyLabel, 9),
     y: 76, size: 9, font: sans, color: muted,
@@ -481,23 +534,36 @@ export const previewCertificate = onCall<PreviewCertificateRequest>(
       throw new HttpsError("permission-denied", "Admins only.");
     }
 
-    const template = request.data.courseId
-      ? await resolveTemplate(request.data.courseId)
-      : await (async () => {
-          const s = (await db.doc("settings/certificate").get()).data() ?? {};
-          return {
-            templatePath: typeof s.templatePath === "string" && s.templatePath ? s.templatePath : null,
-            textColor: s.textColor === "light" ? ("light" as const) : ("dark" as const),
-          };
-        })();
+    // Use the REAL course title so the preview shows exactly what learners get.
+    let courseTitle = "Sample Course";
+    let template: TemplateConfig;
+    if (request.data.courseId) {
+      const courseSnap = await db.doc(`courses/${request.data.courseId}`).get();
+      if (courseSnap.exists && typeof courseSnap.data()?.title === "string") {
+        courseTitle = courseSnap.data()!.title as string;
+      }
+      template = await resolveTemplate(request.data.courseId);
+    } else {
+      const s = (await db.doc("settings/certificate").get()).data() ?? {};
+      const str = (v: unknown): string | null =>
+        typeof v === "string" && v.trim() ? v.trim() : null;
+      template = {
+        templatePath: str(s.templatePath),
+        textColor: s.textColor === "light" ? ("light" as const) : ("dark" as const),
+        signaturePath: str(s.signaturePath),
+        signatoryName: str(s.signatoryName),
+        signatoryTitle: str(s.signatoryTitle),
+      };
+    }
 
     const pdfBytes = await buildCertificatePdf(
       {
-        learnerName: "Ada Lovelace",
-        courseTitle: "Sample Course — Template Preview",
-        certId: "AND-PREV-IEW0",
+        learnerName: "Ada Lovelace (sample learner)",
+        courseTitle,
+        certId: "PREVIEW",
         issuedDate: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }),
-        verifyUrl: `${baseUrl()}/verify/AND-PREV-IEW0`,
+        verifyUrl: "",
+        isPreview: true,
       },
       template
     );

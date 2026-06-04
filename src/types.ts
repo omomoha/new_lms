@@ -48,6 +48,9 @@ export interface Course {
   thumbPath?: string;           // Firebase Storage path for course thumbnail
   certTemplatePath?: string;    // Phase 3: Storage path to a custom certificate background (PNG/JPG)
   certTemplateTextColor?: "dark" | "light"; // overlay text color for the custom template
+  certSignaturePath?: string;   // Storage path to a signature image (PNG/JPG)
+  certSignatoryName?: string;   // e.g. "Jane Doe"
+  certSignatoryTitle?: string;  // e.g. "Director of Learning, Andela"
 }
 
 // ─── Module (subcollection: courses/{id}/modules/{mid}) ──────────────────────

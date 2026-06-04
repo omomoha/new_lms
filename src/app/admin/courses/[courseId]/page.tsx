@@ -15,6 +15,7 @@ import {
   getDocs,
   addDoc,
   updateDoc,
+  deleteDoc,
   serverTimestamp,
   query,
   orderBy,
@@ -79,6 +80,17 @@ export default function CourseBuilderPage() {
   const [certPreviewing, setCertPreviewing] = useState(false);
   const [certError, setCertError] = useState<string | null>(null);
 
+  // Certificate signature
+  const certSignatureRef = useRef<HTMLInputElement>(null);
+  const [sigUploading, setSigUploading] = useState(false);
+  const [signatoryName, setSignatoryName] = useState("");
+  const [signatoryTitle, setSignatoryTitle] = useState("");
+  const [sigSaving, setSigSaving] = useState(false);
+  const [sigSaved, setSigSaved] = useState(false);
+
+  // Deletion state
+  const [deletingCourse, setDeletingCourse] = useState(false);
+
   // Quiz editor: shown after a quiz lesson is created (or for editing)
   // key = lessonId, value = assessment or null if not yet created
   const [quizAssessments, setQuizAssessments] = useState<Record<string, Assessment | null>>({});
@@ -102,6 +114,8 @@ export default function CourseBuilderPage() {
       if (!courseSnap.exists()) { router.push("/admin/courses"); return; }
       const courseData = courseSnap.data() as Course;
       setCourse(courseData);
+      setSignatoryName(courseData.certSignatoryName ?? "");
+      setSignatoryTitle(courseData.certSignatoryTitle ?? "");
 
       const cohortSnap = await getDocs(collection(db, "cohorts"));
       setCohorts(cohortSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Cohort)));
@@ -112,13 +126,16 @@ export default function CourseBuilderPage() {
       const mods = modSnap.docs.map((d) => ({ id: d.id, ...d.data() } as CourseModule));
       setModules(mods);
 
+      // Perf: fetch every module's lessons in PARALLEL (was a serial waterfall)
       const lMap: Record<string, Lesson[]> = {};
-      for (const mod of mods) {
-        const lSnap = await getDocs(
-          query(collection(db, "courses", courseId, "modules", mod.id, "lessons"), orderBy("order"))
-        );
-        lMap[mod.id] = lSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Lesson));
-      }
+      await Promise.all(
+        mods.map(async (mod) => {
+          const lSnap = await getDocs(
+            query(collection(db, "courses", courseId, "modules", mod.id, "lessons"), orderBy("order"))
+          );
+          lMap[mod.id] = lSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Lesson));
+        })
+      );
       setLessonMap(lMap);
 
       // Load quiz assessments for quiz-type lessons
@@ -351,6 +368,115 @@ export default function CourseBuilderPage() {
       });
     } catch (err: unknown) {
       setCertError(err instanceof Error ? err.message : "Failed to remove");
+    }
+  };
+
+  const handleSignatureUpload = async (file: File) => {
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith(".png") && !lower.endsWith(".jpg") && !lower.endsWith(".jpeg")) {
+      setCertError("Signature must be a PNG or JPG image (transparent PNG looks best).");
+      return;
+    }
+    if (file.size > 1 * 1024 * 1024) {
+      setCertError("Signature image must be under 1 MB.");
+      return;
+    }
+    setSigUploading(true);
+    setCertError(null);
+    try {
+      const ext = lower.split(".").pop();
+      const path = `certTemplates/signatures/${courseId}_${Date.now()}.${ext}`;
+      const storedPath = await uploadResource(file, path);
+      await updateDoc(doc(db, "courses", courseId), { certSignaturePath: storedPath });
+      setCourse((prev) => prev ? { ...prev, certSignaturePath: storedPath } : prev);
+    } catch (err: unknown) {
+      setCertError(err instanceof Error ? err.message : "Signature upload failed");
+    } finally {
+      setSigUploading(false);
+    }
+  };
+
+  const handleSignatorySave = async () => {
+    setSigSaving(true);
+    setCertError(null);
+    try {
+      await updateDoc(doc(db, "courses", courseId), {
+        certSignatoryName: signatoryName.trim(),
+        certSignatoryTitle: signatoryTitle.trim(),
+      });
+      setCourse((prev) =>
+        prev ? { ...prev, certSignatoryName: signatoryName.trim(), certSignatoryTitle: signatoryTitle.trim() } : prev
+      );
+      setSigSaved(true);
+      setTimeout(() => setSigSaved(false), 2000);
+    } catch (err: unknown) {
+      setCertError(err instanceof Error ? err.message : "Failed to save signatory");
+    } finally {
+      setSigSaving(false);
+    }
+  };
+
+  // ── Deletion handlers ─────────────────────────────────────────────────────
+
+  const handleDeleteLesson = async (moduleId: string, lessonId: string, title: string) => {
+    if (!window.confirm(`Delete lesson "${title}"? This cannot be undone.`)) return;
+    setError(null);
+    try {
+      await deleteDoc(doc(db, "courses", courseId, "modules", moduleId, "lessons", lessonId));
+      await updateDoc(doc(db, "courses", courseId, "modules", moduleId), {
+        lessonOrder: arrayRemove(lessonId),
+      });
+      load();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete lesson");
+    }
+  };
+
+  const handleDeleteModule = async (moduleId: string, title: string) => {
+    const count = (lessonMap[moduleId] ?? []).length;
+    if (!window.confirm(`Delete module "${title}"${count ? ` and its ${count} lesson${count !== 1 ? "s" : ""}` : ""}? This cannot be undone.`)) return;
+    setError(null);
+    try {
+      await Promise.all(
+        (lessonMap[moduleId] ?? []).map((l) =>
+          deleteDoc(doc(db, "courses", courseId, "modules", moduleId, "lessons", l.id))
+        )
+      );
+      await deleteDoc(doc(db, "courses", courseId, "modules", moduleId));
+      await updateDoc(doc(db, "courses", courseId), { moduleOrder: arrayRemove(moduleId) });
+      load();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete module");
+    }
+  };
+
+  const handleDeleteCourse = async () => {
+    if (!course) return;
+    if (!window.confirm(`Delete the entire course "${course.title}", including all modules and lessons? This cannot be undone.`)) return;
+    if (!window.confirm("Are you absolutely sure? Learner progress records for this course will become orphaned.")) return;
+    setDeletingCourse(true);
+    setError(null);
+    try {
+      // Delete lessons + modules first (Firestore doesn't cascade)
+      for (const mod of modules) {
+        await Promise.all(
+          (lessonMap[mod.id] ?? []).map((l) =>
+            deleteDoc(doc(db, "courses", courseId, "modules", mod.id, "lessons", l.id))
+          )
+        );
+        await deleteDoc(doc(db, "courses", courseId, "modules", mod.id));
+      }
+      // Detach from cohorts
+      await Promise.all(
+        cohorts
+          .filter((c) => (course.assignedCohortIds ?? []).includes(c.id))
+          .map((c) => updateDoc(doc(db, "cohorts", c.id), { courseIds: arrayRemove(courseId) }))
+      );
+      await deleteDoc(doc(db, "courses", courseId));
+      router.push("/admin/courses");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete course");
+      setDeletingCourse(false);
     }
   };
 
@@ -626,6 +752,61 @@ export default function CourseBuilderPage() {
             variant={course.certTemplatePath ? "success" : "warning"}
           />
         </div>
+        {/* Signature block */}
+        <div className="mt-4 pt-4 border-t" style={{ borderColor: "#DDE6DF" }}>
+          <h3 className="text-sm font-medium mb-1" style={{ color: "#1E302C" }}>Signature</h3>
+          <p className="text-xs mb-3" style={{ color: "#5E6E69" }}>
+            Drawn at the bottom-left of every certificate for this course. Upload a signature
+            image (transparent PNG recommended) and enter the signatory&apos;s name and title.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center flex-wrap">
+            <input
+              ref={certSignatureRef}
+              type="file"
+              accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleSignatureUpload(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              disabled={sigUploading}
+              onClick={() => certSignatureRef.current?.click()}
+              className="btn-secondary text-xs"
+            >
+              {sigUploading
+                ? "Uploading…"
+                : course.certSignaturePath
+                ? "Replace signature image"
+                : "Upload signature image"}
+            </button>
+            <input
+              className="input-field text-xs sm:!w-48"
+              placeholder="Signatory name"
+              value={signatoryName}
+              onChange={(e) => setSignatoryName(e.target.value)}
+              aria-label="Signatory name"
+            />
+            <input
+              className="input-field text-xs sm:!w-64"
+              placeholder="Signatory title (e.g. Director of Learning)"
+              value={signatoryTitle}
+              onChange={(e) => setSignatoryTitle(e.target.value)}
+              aria-label="Signatory title"
+            />
+            <button
+              type="button"
+              onClick={handleSignatorySave}
+              disabled={sigSaving}
+              className="btn-primary text-xs"
+            >
+              {sigSaving ? "Saving…" : sigSaved ? "Saved ✓" : "Save signatory"}
+            </button>
+          </div>
+        </div>
         {certError && <p className="text-xs mt-2 text-red-600">{certError}</p>}
       </div>
 
@@ -636,12 +817,22 @@ export default function CourseBuilderPage() {
             {/* Module header strip */}
             <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b" style={{ borderColor: "#DDE6DF", backgroundColor: "#F5F7F4" }}>
               <h2 className="font-semibold text-sm" style={{ color: "#13403A" }}>{mod.title}</h2>
-              <button
-                onClick={() => setAddingLessonTo(addingLessonTo === mod.id ? null : mod.id)}
-                className="btn-secondary text-xs px-2.5 py-1"
-              >
-                + Lesson
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setAddingLessonTo(addingLessonTo === mod.id ? null : mod.id)}
+                  className="btn-secondary text-xs px-2.5 py-1"
+                >
+                  + Lesson
+                </button>
+                <button
+                  onClick={() => handleDeleteModule(mod.id, mod.title)}
+                  className="btn-secondary text-xs px-2.5 py-1 !text-red-700"
+                  aria-label={`Delete module ${mod.title}`}
+                  title="Delete module"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
             <div className="px-4 sm:px-5 py-3">
               {/* Lesson list */}
@@ -669,6 +860,15 @@ export default function CourseBuilderPage() {
                               : "Set Up Quiz"}
                           </button>
                         )}
+                        <button
+                          onClick={() => handleDeleteLesson(mod.id, lesson.id, lesson.title)}
+                          className="text-xs px-1.5 py-0.5 rounded hover:bg-red-50"
+                          style={{ color: "#B91C1C" }}
+                          aria-label={`Delete lesson ${lesson.title}`}
+                          title="Delete lesson"
+                        >
+                          ✕
+                        </button>
                       </div>
                       {/* Inline quiz editor for this lesson */}
                       {lesson.type === "quiz" && editingQuizLessonId === lesson.id && (
@@ -883,6 +1083,23 @@ export default function CourseBuilderPage() {
           + Add Module
         </button>
       )}
+
+      {/* Danger zone */}
+      <div className="card mt-8" style={{ borderColor: "#FCA5A5" }}>
+        <h2 className="font-medium mb-1" style={{ color: "#B91C1C" }}>Danger zone</h2>
+        <p className="text-xs mb-3" style={{ color: "#5E6E69" }}>
+          Permanently delete this course, all its modules and lessons, and remove it from
+          assigned cohorts. Uploaded video/document files remain in storage.
+        </p>
+        <button
+          onClick={handleDeleteCourse}
+          disabled={deletingCourse}
+          className="btn-secondary text-xs !text-red-700"
+          style={{ borderColor: "#FCA5A5" }}
+        >
+          {deletingCourse ? "Deleting…" : "Delete this course"}
+        </button>
+      </div>
     </AdminShell>
   );
 }
