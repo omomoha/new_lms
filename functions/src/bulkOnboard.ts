@@ -65,7 +65,7 @@ function generateTempPassword(): string {
 const COHORT_TAG_RE = /^[\w-]{1,64}$/;
 
 export const bulkOnboard = onCall(
-  { region: "us-central1", enforceAppCheck: false },
+  { region: "us-central1", enforceAppCheck: process.env.ENFORCE_APPCHECK === "true" },
   async (request) => {
     // Require caller to be an admin
     if (request.auth?.token?.role !== "admin") {

@@ -281,7 +281,7 @@ function parseText(
 // ── Cloud Function ────────────────────────────────────────────────────────────
 
 export const parseAssessmentDoc = onCall<ParseAssessmentDocRequest>(
-  { region: "us-central1", enforceAppCheck: false },
+  { region: "us-central1", enforceAppCheck: process.env.ENFORCE_APPCHECK === "true" },
   async (request): Promise<ParseAssessmentDocResponse> => {
     // Must be authenticated
     if (!request.auth) {

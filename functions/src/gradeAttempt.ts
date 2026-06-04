@@ -40,7 +40,7 @@ interface GradeAttemptResponse {
 }
 
 export const gradeAttempt = onCall<GradeAttemptRequest>(
-  { region: "us-central1", enforceAppCheck: false },
+  { region: "us-central1", enforceAppCheck: process.env.ENFORCE_APPCHECK === "true" },
   async (request): Promise<GradeAttemptResponse> => {
     // Must be authenticated
     if (!request.auth) {

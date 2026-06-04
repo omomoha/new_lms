@@ -33,6 +33,7 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import getClientAuth from "@/lib/firebase/auth";
 import db from "@/lib/firebase/firestore";
+import { initAppCheck } from "@/lib/firebase/appCheck";
 import type { AppUser } from "@/types";
 
 interface AuthContextValue {
@@ -68,6 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Phase 3: App Check attestation (no-op until the site key env is set)
+    initAppCheck();
     const auth = getClientAuth();
     const unsubscribe = onIdTokenChanged(auth, async (firebaseUser: User | null) => {
       setUser(firebaseUser);
