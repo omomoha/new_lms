@@ -166,11 +166,17 @@ service cloud.firestore {
     // ── attempts/{attemptId} ────────────────────────────────────────────────
     // Written ONLY by the gradeAttempt Cloud Function via admin SDK.
     // attemptId format: "{uid}_{assessmentId}_{uuid}"
-    // Read rule uses the doc-ID prefix pattern (same as enrollments/progress)
-    // so list queries work without requiring resource.data access.
+    //
+    // FIX: the previous doc-ID prefix rule (attemptId.matches(uid + "_.*"))
+    // is NOT provable for list queries filtered by fields, so every learner
+    // query for their own attempts was denied (surfaced as "Missing or
+    // insufficient permissions" on any course with assessments). Owner check
+    // now uses resource.data.userId — provable for queries that filter
+    // userId == request.auth.uid (which all client queries do), and valid
+    // for single-doc gets. userId is always set by gradeAttempt.
     match /attempts/{attemptId} {
       allow read: if isAdmin()
-        || (isAuthed() && attemptId.matches(request.auth.uid + "_.*"));
+        || (isAuthed() && resource.data.userId == request.auth.uid);
       allow write: if false; // gradeAttempt function only via admin SDK
     }
 
