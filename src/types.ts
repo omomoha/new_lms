@@ -193,4 +193,5 @@ export interface Attempt {
   total: number;               // total number of questions
   passed: boolean;
   submittedAt: Timestamp;
+  durationSec?: number | null; // time from opening the form to submitting (client-reported)
 }

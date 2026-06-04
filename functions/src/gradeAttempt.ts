@@ -26,6 +26,7 @@ const db = admin.firestore();
 interface GradeAttemptRequest {
   assessmentId: string;
   answers: Record<string, number>; // { [questionId]: selectedOptionIndex }
+  durationSec?: number; // seconds from opening the form to submitting (client-reported)
 }
 
 interface PerQuestion {
@@ -48,7 +49,13 @@ export const gradeAttempt = onCall<GradeAttemptRequest>(
     }
 
     const uid = request.auth.uid;
-    const { assessmentId, answers } = request.data;
+    const { assessmentId, answers, durationSec } = request.data;
+
+    // Sanitize client-reported duration: positive number, capped at 4 h.
+    const cleanDuration =
+      typeof durationSec === "number" && isFinite(durationSec) && durationSec > 0
+        ? Math.min(Math.round(durationSec), 4 * 60 * 60)
+        : null;
 
     if (!assessmentId || typeof assessmentId !== "string") {
       throw new HttpsError("invalid-argument", "assessmentId is required.");
@@ -133,6 +140,33 @@ export const gradeAttempt = onCall<GradeAttemptRequest>(
       }
     }
 
+    // ── Pre-before-post gate ─────────────────────────────────────────────────
+    // Learners must take the pre-assessment (any attempt, pass not required)
+    // before submitting the post-assessment. Admins are exempt (testing).
+    if (assessment.kind === "post" && !isAdmin) {
+      const preSnap = await db
+        .collection("assessments")
+        .where("courseId", "==", assessment.courseId)
+        .where("kind", "==", "pre")
+        .limit(1)
+        .get();
+      if (!preSnap.empty) {
+        const preId = preSnap.docs[0].id;
+        const preAttempt = await db
+          .collection("attempts")
+          .where("userId", "==", uid)
+          .where("assessmentId", "==", preId)
+          .limit(1)
+          .get();
+        if (preAttempt.empty) {
+          throw new HttpsError(
+            "failed-precondition",
+            "You must take the pre-assessment before the final assessment."
+          );
+        }
+      }
+    }
+
     // ── Rate limit: reject if latest attempt within last 30 seconds ──────────
     const recentSnap = await db
       .collection("attempts")
@@ -193,6 +227,7 @@ export const gradeAttempt = onCall<GradeAttemptRequest>(
       total,
       passed,
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+      durationSec: cleanDuration,
     });
 
     return { score, total, passed, perQuestion };

@@ -13,7 +13,7 @@
  *  - existingAttempt: if provided, render read-only results from a past attempt
  */
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { httpsCallable } from "firebase/functions";
 import functions from "@/lib/firebase/functions";
 import type { Assessment, Attempt } from "@/types";
@@ -21,6 +21,7 @@ import type { Assessment, Attempt } from "@/types";
 interface GradeAttemptRequest {
   assessmentId: string;
   answers: Record<string, number>;
+  durationSec?: number;
 }
 
 interface GradeAttemptResponse {
@@ -46,6 +47,14 @@ export default function QuizForm({ assessment, onPassed, existingAttempt }: Quiz
   // of whether existingAttempt is still set (parent doesn't re-fetch until reload)
   const [retrying, setRetrying] = useState(false);
 
+  // Phase 3 insights: time-to-complete. Stamped when the form becomes visible
+  // (mount or Retake), submitted as durationSec with the attempt.
+  const startedAtRef = useRef<number>(Date.now());
+  const formVisible = (!existingAttempt || retrying) && !result;
+  useEffect(() => {
+    if (formVisible) startedAtRef.current = Date.now();
+  }, [formVisible]);
+
   const gradeAttemptFn = httpsCallable<GradeAttemptRequest, GradeAttemptResponse>(
     functions,
     "gradeAttempt"
@@ -66,6 +75,7 @@ export default function QuizForm({ assessment, onPassed, existingAttempt }: Quiz
       const res = await gradeAttemptFn({
         assessmentId: assessment.id,
         answers: selected,
+        durationSec: Math.round((Date.now() - startedAtRef.current) / 1000),
       });
       setResult(res.data);
       setRetrying(false); // submission complete; reset retrying flag

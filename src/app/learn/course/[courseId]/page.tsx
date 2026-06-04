@@ -359,8 +359,20 @@ export default function CoursePage() {
           </Link>
         )}
 
-        {/* Post-assessment banner: show when course is 100% complete */}
-        {postAssessment && courseComplete && !postAttempt && (
+        {/* Pre-before-post: if the course is complete but the pre-assessment was
+            never taken, point the learner there before unlocking the post. */}
+        {postAssessment && courseComplete && !postAttempt && preAssessment && !preAttempt && (
+          <div className="card mb-4" style={{ borderLeft: "4px solid #B45309", backgroundColor: "#FFFBEB" }}>
+            <span className="kicker text-xs" style={{ color: "#B45309" }}>POST-COURSE ASSESSMENT — LOCKED</span>
+            <p className="text-sm mt-1" style={{ color: "#1E302C" }}>
+              Take the <b>pre-course assessment</b> above first — it&apos;s required before the
+              final assessment so we can measure your improvement.
+            </p>
+          </div>
+        )}
+
+        {/* Post-assessment banner: course 100% complete AND pre taken (if one exists) */}
+        {postAssessment && courseComplete && !postAttempt && (!preAssessment || !!preAttempt) && (
           <div className="card mb-4" style={{ borderLeft: "4px solid #13403A" }}>
             <div className="flex items-start justify-between gap-3">
               <div>
