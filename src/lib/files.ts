@@ -79,9 +79,18 @@ export async function getResourceUrl(storagePath: string): Promise<string> {
 /** Extensions accepted per lesson type, used for <input accept="..."> */
 export const ACCEPT_BY_TYPE: Record<string, string> = {
   slides: ".pptx,.ppt,.pdf",
-  doc: ".docx,.doc,.pdf",
-  lab: ".pdf,.docx,.doc",
+  doc: ".docx,.doc,.pdf,.md,.txt",
+  lab: ".pdf,.docx,.doc,.md,.txt",
 };
+
+/** Return true if the path/URL points to a plain-text/markdown file that we
+ *  render natively (Office Online cannot preview these). */
+export function isTextDoc(filename: string): boolean {
+  const clean = (() => {
+    try { return new URL(filename).pathname; } catch { return filename.split("?")[0]; }
+  })().toLowerCase();
+  return clean.endsWith(".md") || clean.endsWith(".markdown") || clean.endsWith(".txt");
+}
 
 /** Return true if the path/URL points to a PDF file.
  *  Strips query strings and fragments before checking the extension. */

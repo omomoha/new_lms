@@ -47,6 +47,13 @@ export function VideoPlayer({
   const [url, setUrl] = useState<string | null>(null);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [captionsUrl, setCaptionsUrl] = useState<string | null>(null);
+  // Quality selection: "source" = original upload (up to 1080p), "720p" = the
+  // server-transcoded variant ({path minus ext}_720p.mp4, created by the
+  // transcodeVideo function). 720p is requested lazily; if the variant doesn't
+  // exist (yet), we fall back to source and mark it unavailable.
+  const [quality, setQuality] = useState<"source" | "720p">("source");
+  const [qualityNote, setQualityNote] = useState<string | null>(null);
+  const [switching, setSwitching] = useState(false);
   const [completed, setCompleted] = useState(false);
   const completedRef = useRef(false); // Fix #1/#2: authoritative ref for race-free completion check
   const lastSavedAt = useRef<number>(0);
@@ -81,6 +88,43 @@ export function VideoPlayer({
     })();
     return () => { cancelled = true; };
   }, [videoPath, progressDocId]);
+
+  // Switch between source and the 720p variant, preserving position/play state.
+  const handleQualityChange = useCallback(async (next: "source" | "720p") => {
+    if (next === quality || switching) return;
+    const variantPath = next === "720p"
+      ? videoPath.replace(/\.[^/.]+$/, "") + "_720p.mp4"
+      : videoPath;
+    const el = videoRef.current;
+    const pos = el?.currentTime ?? 0;
+    const wasPlaying = !!el && !el.paused && !el.ended;
+    setSwitching(true);
+    setQualityNote(null);
+    try {
+      const newUrl = await videoService.getPlaybackUrl(variantPath);
+      setQuality(next);
+      setUrl(newUrl);
+      // restore position once the new source has metadata
+      requestAnimationFrame(() => {
+        const v = videoRef.current;
+        if (!v) return;
+        const restore = () => {
+          v.currentTime = pos;
+          if (wasPlaying) v.play().catch(() => {});
+        };
+        if (v.readyState >= 1) restore();
+        else v.addEventListener("loadedmetadata", restore, { once: true });
+      });
+    } catch {
+      setQualityNote(
+        next === "720p"
+          ? "720p isn't ready for this video yet — playing the original."
+          : "Could not switch quality."
+      );
+    } finally {
+      setSwitching(false);
+    }
+  }, [quality, switching, videoPath]);
 
   // Phase 3: load captions as a same-origin blob URL.
   // Browsers fetch <track> sources in CORS mode; converting the VTT file to a
@@ -232,6 +276,8 @@ export function VideoPlayer({
         src={url}
         controls
         playsInline
+        controlsList="nodownload noremoteplayback"
+        onContextMenu={(e) => e.preventDefault()}
         className="w-full rounded-xl bg-black aspect-video"
         onTimeUpdate={handleTimeUpdate}
         onPause={handlePause}
@@ -250,6 +296,26 @@ export function VideoPlayer({
           />
         )}
       </video>
+      {/* Quality picker — just below the frame, right-aligned */}
+      <div className="flex items-center justify-end gap-2 mt-2">
+        {qualityNote && (
+          <span className="text-xs" style={{ color: "#B45309" }}>{qualityNote}</span>
+        )}
+        <label className="text-xs inline-flex items-center gap-1.5" style={{ color: "#5E6E69" }}>
+          Quality
+          <select
+            value={quality}
+            disabled={switching}
+            onChange={(e) => handleQualityChange(e.target.value as "source" | "720p")}
+            className="input-field !w-auto !py-1 text-xs"
+            aria-label="Video quality"
+          >
+            <option value="source">Best (up to 1080p)</option>
+            <option value="720p">720p</option>
+          </select>
+        </label>
+      </div>
+
       {/* Fix #3: inline save-error message */}
       {saveError && (
         <p className="mt-2 text-xs text-red-600">{saveError}</p>

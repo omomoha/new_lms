@@ -13,7 +13,7 @@ import {
   doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, where, serverTimestamp
 } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
-import { getResourceUrl, isPdf } from "@/lib/files";
+import { getResourceUrl, isPdf, isTextDoc } from "@/lib/files";
 import { calcProgressPct } from "@/lib/progress";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Course, CourseModule, Lesson, LessonProgress, Enrollment, Assessment, Attempt } from "@/types";
@@ -44,7 +44,9 @@ export default function LessonPage() {
 
   // Document / slides viewer state
   const [resourceUrl, setResourceUrl] = useState<string | null>(null);
+  const [resourceText, setResourceText] = useState<string | null>(null); // .md/.txt rendered natively
   const [resourceError, setResourceError] = useState<string | null>(null);
+  const [showTranscript, setShowTranscript] = useState(false);
   const [docCompleted, setDocCompleted] = useState(false);
   const [markingComplete, setMarkingComplete] = useState(false);
   const [markCompleteError, setMarkCompleteError] = useState<string | null>(null);
@@ -157,13 +159,23 @@ export default function LessonPage() {
 
     let cancelled = false;
     setResourceUrl(null);
+    setResourceText(null);
     setResourceError(null);
 
     (async () => {
       try {
         if (lesson.filePath) {
           const url = await getResourceUrl(lesson.filePath);
-          if (!cancelled) setResourceUrl(url);
+          if (cancelled) return;
+          setResourceUrl(url);
+          // Markdown / plain-text docs: fetch and render natively (Office
+          // Online cannot preview them and would show "File not found").
+          if (isTextDoc(lesson.filePath)) {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`doc fetch failed: ${res.status}`);
+            const text = await res.text();
+            if (!cancelled) setResourceText(text);
+          }
         } else if (lesson.fileUrl) {
           if (!cancelled) setResourceUrl(lesson.fileUrl);
         }
@@ -406,6 +418,13 @@ export default function LessonPage() {
                   <p className="text-xs" style={{ color: "#5E6E69" }}>
                     Video hosted externally — watch progress is not tracked automatically.
                   </p>
+                  {lesson.transcript && (
+                    <TranscriptPanel
+                      transcript={lesson.transcript}
+                      open={showTranscript}
+                      onToggle={() => setShowTranscript((v) => !v)}
+                    />
+                  )}
                   <NonVideoCompleteButton
                     completed={docCompleted}
                     loading={markingComplete}
@@ -428,20 +447,11 @@ export default function LessonPage() {
                   onComplete={handleLessonComplete}
                 />
                 {lesson.transcript && (
-                  <details className="mt-4 card">
-                    <summary
-                      className="cursor-pointer text-sm font-semibold select-none"
-                      style={{ color: "#13403A" }}
-                    >
-                      Transcript
-                    </summary>
-                    <div
-                      className="mt-3 text-sm whitespace-pre-wrap leading-relaxed"
-                      style={{ color: "#1E302C" }}
-                    >
-                      {lesson.transcript}
-                    </div>
-                  </details>
+                  <TranscriptPanel
+                    transcript={lesson.transcript}
+                    open={showTranscript}
+                    onToggle={() => setShowTranscript((v) => !v)}
+                  />
                 )}
               </>
             )
@@ -490,17 +500,7 @@ export default function LessonPage() {
           ) : /* ── Slides / Doc / Lab with resource file ───────────────────── */
           (lesson.type === "slides" || lesson.type === "doc" || lesson.type === "lab") ? (
             <div className="space-y-4">
-              {resourceUrl && (
-                <a
-                  href={resourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 btn-secondary text-sm"
-                >
-                  ↗ Open / download file
-                </a>
-              )}
-
+              {/* Downloads are disabled for learners — content is view-only. */}
               {resourceError ? (
                 <div className="card py-10 text-center text-sm" style={{ color: "#5E6E69" }}>
                   {resourceError}
@@ -515,9 +515,18 @@ export default function LessonPage() {
                     <p className="text-sm">File not yet uploaded for this lesson.</p>
                   </div>
                 )
+              ) : isTextDoc(lesson.filePath ?? lesson.fileUrl ?? "") ? (
+                /* Markdown / plain-text docs render natively */
+                resourceText !== null ? (
+                  <TextLessonContent content={resourceText} />
+                ) : (
+                  <div className="w-full rounded-xl flex items-center justify-center" style={{ height: "40vh", backgroundColor: "#E7F1DE" }}>
+                    <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#8FB85C" }} />
+                  </div>
+                )
               ) : isPdf(lesson.filePath ?? lesson.fileUrl ?? "") ? (
                 <iframe
-                  src={resourceUrl}
+                  src={`${resourceUrl}#toolbar=0&navpanes=0`}
                   title={lesson.title}
                   className="w-full rounded-xl border"
                   style={{ height: "70vh", borderColor: "#DDE6DF" }}
@@ -556,6 +565,43 @@ export default function LessonPage() {
         </main>
       </div>
     </LearnerShell>
+  );
+}
+
+// ── Transcript panel: toggle button + text, just below the video frame ──────
+
+interface TranscriptPanelProps {
+  transcript: string;
+  open: boolean;
+  onToggle: () => void;
+}
+
+function TranscriptPanel({ transcript, open, onToggle }: TranscriptPanelProps) {
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls="lesson-transcript"
+        className="btn-secondary text-xs"
+      >
+        {open ? "Hide transcript" : "📄 Transcript"}
+      </button>
+      {open && (
+        <div id="lesson-transcript" className="card mt-2">
+          <h2 className="text-sm font-semibold mb-2" style={{ color: "#13403A" }}>
+            Transcript
+          </h2>
+          <div
+            className="text-sm whitespace-pre-wrap leading-relaxed"
+            style={{ color: "#1E302C" }}
+          >
+            {transcript}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
