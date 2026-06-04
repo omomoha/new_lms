@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   collection,
   getDocs,
@@ -22,6 +23,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
 
 export default function UsersPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<AppUser[]>([]);
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [loading, setLoading] = useState(true);
@@ -178,6 +180,14 @@ export default function UsersPage() {
                   })
                 )}
               </div>
+              {/* View learner analytics */}
+              <button
+                onClick={() => router.push(`/admin/users/${u.uid}`)}
+                className="btn-secondary text-xs flex-shrink-0"
+                title="View learner analytics"
+              >
+                View &rarr;
+              </button>
             </div>
           ))}
         </div>

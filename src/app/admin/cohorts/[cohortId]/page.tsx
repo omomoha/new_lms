@@ -5,6 +5,7 @@
  *
  * Manage a single cohort:
  *  - Rename (name + tag) and change color.
+ *  - Cohort Progress card: per-course avg progress bars + per-member table.
  *  - Members card: list ALL users with a chip-toggle per user
  *    (arrayUnion / arrayRemove on users/{uid}.cohortIds).
  *  - Courses card: list ALL courses with a toggle per course
@@ -27,12 +28,30 @@ import {
   arrayRemove,
 } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
-import type { Cohort, AppUser, Course } from "@/types";
+import type { Cohort, AppUser, Course, Enrollment } from "@/types";
 import AdminShell from "@/components/layout/AdminShell";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
 
 const COLORS = ["#2C7A6B", "#7FB069", "#13403A", "#C9772F", "#5E6E69"];
+
+// ── Analytics types ──────────────────────────────────────────────────────────
+
+interface CourseAnalytic {
+  courseId: string;
+  title: string;
+  avgPct: number;        // average progressPct across members
+  completedCount: number;
+  memberCount: number;
+}
+
+interface MemberAnalytic {
+  uid: string;
+  name: string;
+  email: string;
+  avgPct: number;
+  completedCount: number;
+}
 
 export default function CohortDetailPage() {
   const params = useParams();
@@ -44,6 +63,10 @@ export default function CohortDetailPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Analytics
+  const [courseAnalytics, setCourseAnalytics] = useState<CourseAnalytic[]>([]);
+  const [memberAnalytics, setMemberAnalytics] = useState<MemberAnalytic[]>([]);
 
   // Rename form
   const [editName, setEditName] = useState("");
@@ -92,9 +115,60 @@ export default function CohortDetailPage() {
         })
       );
 
-      setCourses(
-        cSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Course))
+      const allCourses = cSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Course));
+      setCourses(allCourses);
+
+      // ── Cohort progress analytics ─────────────────────────────────────────
+      // Only compute for courses assigned to this cohort and users who are members.
+      const memberUsers = uSnap.docs
+        .map((d) => {
+          const data = d.data() as AppUser;
+          return { ...data, uid: d.id, cohortIds: Array.isArray(data.cohortIds) ? data.cohortIds : [] };
+        })
+        .filter((u) => u.cohortIds.includes(cohortData.id));
+
+      const assignedCourses = allCourses.filter((c) =>
+        (cohortData.courseIds ?? []).includes(c.id)
       );
+
+      if (memberUsers.length > 0 && assignedCourses.length > 0) {
+        // Fetch all enrollment docs via direct getDoc (no composite index needed)
+        const enrollmentPromises = memberUsers.flatMap((u) =>
+          assignedCourses.map((c) =>
+            getDoc(doc(db, "enrollments", `${u.uid}_${c.id}`)).then((snap) => ({
+              uid: u.uid,
+              courseId: c.id,
+              progressPct: snap.exists() ? ((snap.data() as Enrollment).progressPct ?? 0) : 0,
+            }))
+          )
+        );
+        const enrollments = await Promise.all(enrollmentPromises);
+
+        // Build per-course analytics
+        const cAnalytics: CourseAnalytic[] = assignedCourses.map((c) => {
+          const rows = enrollments.filter((e) => e.courseId === c.id);
+          const sum = rows.reduce((acc, r) => acc + r.progressPct, 0);
+          const avgPct = rows.length > 0 ? Math.round(sum / rows.length) : 0;
+          const completedCount = rows.filter((r) => r.progressPct >= 100).length;
+          return { courseId: c.id, title: c.title, avgPct, completedCount, memberCount: memberUsers.length };
+        });
+        setCourseAnalytics(cAnalytics);
+
+        // Build per-member analytics
+        const mAnalytics: MemberAnalytic[] = memberUsers.map((u) => {
+          const rows = enrollments.filter((e) => e.uid === u.uid);
+          const sum = rows.reduce((acc, r) => acc + r.progressPct, 0);
+          const avgPct = rows.length > 0 ? Math.round(sum / rows.length) : 0;
+          const completedCount = rows.filter((r) => r.progressPct >= 100).length;
+          return { uid: u.uid, name: u.name || u.email, email: u.email, avgPct, completedCount };
+        });
+        // Sort client-side: most progress first
+        mAnalytics.sort((a, b) => b.avgPct - a.avgPct);
+        setMemberAnalytics(mAnalytics);
+      } else {
+        setCourseAnalytics([]);
+        setMemberAnalytics([]);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load cohort");
     } finally {
@@ -344,6 +418,104 @@ export default function CohortDetailPage() {
           </button>
         </div>
       </form>
+
+      {/* ── Cohort Progress card ────────────────────────────────────────────── */}
+      <div className="card mb-4">
+        <h2 className="font-medium mb-4" style={{ color: "#1E302C" }}>
+          Cohort progress
+        </h2>
+
+        {courseAnalytics.length === 0 && memberAnalytics.length === 0 ? (
+          <p className="text-sm py-2" style={{ color: "#5E6E69" }}>
+            No assigned courses or members yet — assign courses and add members to see progress analytics.
+          </p>
+        ) : (
+          <>
+            {/* Per-course progress bars */}
+            {courseAnalytics.length > 0 && (
+              <div className="mb-5">
+                <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: "#5E6E69" }}>
+                  Course averages
+                </p>
+                <div className="flex flex-col gap-3">
+                  {courseAnalytics.map((ca) => (
+                    <div key={ca.courseId} className="flex items-center gap-3">
+                      <span
+                        className="text-xs font-medium w-36 flex-shrink-0 truncate"
+                        style={{ color: "#1E302C" }}
+                        title={ca.title}
+                      >
+                        {ca.title}
+                      </span>
+                      {/* Bar track */}
+                      <div
+                        className="flex-1 rounded-sm relative"
+                        style={{ height: "18px", backgroundColor: "#E7F1DE" }}
+                      >
+                        <div
+                          className="absolute top-0 left-0 h-full rounded-sm transition-all"
+                          style={{
+                            width: `${ca.avgPct}%`,
+                            backgroundColor: ca.avgPct >= 100 ? "#8FB85C" : "#2C7A6B",
+                          }}
+                        />
+                      </div>
+                      <span
+                        className="text-xs font-semibold w-10 flex-shrink-0 text-right tabular-nums"
+                        style={{ color: "#13403A" }}
+                      >
+                        {ca.avgPct}%
+                      </span>
+                      <span
+                        className="text-xs w-24 flex-shrink-0 text-right tabular-nums"
+                        style={{ color: "#5E6E69" }}
+                      >
+                        {ca.completedCount}/{ca.memberCount} done
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Per-member compact table */}
+            {memberAnalytics.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#5E6E69" }}>
+                  Member overview
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid #DDE6DF" }}>
+                        <th className="text-left pb-2 font-semibold" style={{ color: "#5E6E69" }}>Name</th>
+                        <th className="text-right pb-2 font-semibold pr-2" style={{ color: "#5E6E69" }}>Avg %</th>
+                        <th className="text-right pb-2 font-semibold" style={{ color: "#5E6E69" }}>Completed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {memberAnalytics.map((ma) => (
+                        <tr key={ma.uid} style={{ borderBottom: "1px solid #F0F4F1" }}>
+                          <td className="py-2 truncate max-w-[160px]" style={{ color: "#1E302C" }}>
+                            <span className="font-medium">{ma.name}</span>
+                            <span className="ml-2 text-xs" style={{ color: "#9EB3AD" }}>{ma.email}</span>
+                          </td>
+                          <td className="py-2 text-right pr-2 tabular-nums font-semibold" style={{ color: "#13403A" }}>
+                            {ma.avgPct}%
+                          </td>
+                          <td className="py-2 text-right tabular-nums" style={{ color: "#5E6E69" }}>
+                            {ma.completedCount}/{courseAnalytics.length}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* ── Members card ────────────────────────────────────────────────────── */}
       <div className="card mb-4">
