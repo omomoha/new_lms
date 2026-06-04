@@ -31,6 +31,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
 import QuizEditor from "@/components/quiz/QuizEditor";
 import { toEmbedUrl } from "@/lib/videoEmbed";
+import { EntityThumb } from "@/components/ui/Thumb";
 
 const LESSON_TYPES: LessonType[] = ["video", "text", "slides", "doc", "lab", "quiz"];
 
@@ -74,6 +75,11 @@ export default function CourseBuilderPage() {
   const [preAssessment, setPreAssessment] = useState<Assessment | null | undefined>(undefined);
   const [postAssessment, setPostAssessment] = useState<Assessment | null | undefined>(undefined);
   const [editingPrePost, setEditingPrePost] = useState<AssessmentKind | null>(null);
+
+  // Thumbnail upload
+  const thumbInputRef = useRef<HTMLInputElement>(null);
+  const [thumbUploading, setThumbUploading] = useState(false);
+  const [thumbError, setThumbError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -266,6 +272,26 @@ export default function CourseBuilderPage() {
     }
   };
 
+  const handleThumbUpload = async (file: File) => {
+    if (file.size > 2 * 1024 * 1024) {
+      setThumbError("Image must be under 2 MB.");
+      return;
+    }
+    setThumbUploading(true);
+    setThumbError(null);
+    try {
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const path = `thumbnails/courses/${courseId}_${Date.now()}.${ext}`;
+      const storedPath = await uploadResource(file, path);
+      await updateDoc(doc(db, "courses", courseId), { thumbPath: storedPath });
+      setCourse((prev) => prev ? { ...prev, thumbPath: storedPath } : prev);
+    } catch (err: unknown) {
+      setThumbError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setThumbUploading(false);
+    }
+  };
+
   if (loading) return (
     <AdminShell>
       <div className="flex justify-center py-20"><Spinner /></div>
@@ -289,7 +315,41 @@ export default function CourseBuilderPage() {
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+          {/* Thumbnail upload */}
+          <div className="flex items-center gap-2">
+            {/* Preview */}
+            <div className="h-16 w-24 rounded-lg overflow-hidden flex-shrink-0 border border-white/20">
+              <EntityThumb
+                thumbPath={course.thumbPath}
+                seed={course.id}
+                title={course.title}
+                className="w-full h-full"
+              />
+            </div>
+            <input
+              ref={thumbInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleThumbUpload(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              disabled={thumbUploading}
+              onClick={() => thumbInputRef.current?.click()}
+              className="btn-secondary text-xs px-3 py-1.5"
+            >
+              {thumbUploading ? "Uploading…" : "Thumbnail"}
+            </button>
+          </div>
+          {thumbError && (
+            <p className="text-xs text-red-300 w-full text-right">{thumbError}</p>
+          )}
           <Badge
             label={course.status}
             variant={course.status === "published" ? "success" : "warning"}

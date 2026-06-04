@@ -30,6 +30,7 @@ export interface Cohort {
   color: string;       // hex color for UI badge
   courseIds: string[];
   createdAt: Timestamp;
+  thumbPath?: string;  // Firebase Storage path for cohort thumbnail
 }
 
 // ─── Course ──────────────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ export interface Course {
   moduleOrder: string[];        // ordered list of module IDs
   assignedCohortIds: string[];
   createdAt: Timestamp;
+  thumbPath?: string;           // Firebase Storage path for course thumbnail
 }
 
 // ─── Module (subcollection: courses/{id}/modules/{mid}) ──────────────────────

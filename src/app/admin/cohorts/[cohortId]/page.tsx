@@ -15,7 +15,7 @@
  *    docs and assigned course docs, then delete the cohort doc.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   doc,
@@ -28,10 +28,12 @@ import {
   arrayRemove,
 } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
+import { uploadResource } from "@/lib/files";
 import type { Cohort, AppUser, Course, Enrollment } from "@/types";
 import AdminShell from "@/components/layout/AdminShell";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
+import { EntityThumb } from "@/components/ui/Thumb";
 
 const COLORS = ["#2C7A6B", "#7FB069", "#13403A", "#C9772F", "#5E6E69"];
 
@@ -83,6 +85,11 @@ export default function CohortDetailPage() {
 
   // Delete
   const [deleting, setDeleting] = useState(false);
+
+  // Thumbnail upload
+  const thumbInputRef = useRef<HTMLInputElement>(null);
+  const [thumbUploading, setThumbUploading] = useState(false);
+  const [thumbError, setThumbError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -305,6 +312,27 @@ export default function CohortDetailPage() {
     }
   };
 
+  // ── Thumbnail upload ────────────────────────────────────────────────────────
+  const handleThumbUpload = async (file: File) => {
+    if (file.size > 2 * 1024 * 1024) {
+      setThumbError("Image must be under 2 MB.");
+      return;
+    }
+    setThumbUploading(true);
+    setThumbError(null);
+    try {
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const path = `thumbnails/cohorts/${cohortId}_${Date.now()}.${ext}`;
+      const storedPath = await uploadResource(file, path);
+      await updateDoc(doc(db, "cohorts", cohortId), { thumbPath: storedPath });
+      setCohort((prev) => prev ? { ...prev, thumbPath: storedPath } : prev);
+    } catch (err: unknown) {
+      setThumbError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setThumbUploading(false);
+    }
+  };
+
   // ── Derived ─────────────────────────────────────────────────────────────────
   const memberCount = users.filter((u) =>
     (u.cohortIds ?? []).includes(cohortId)
@@ -335,29 +363,65 @@ export default function CohortDetailPage() {
     <AdminShell>
       {/* Page hero band */}
       <div className="page-hero flex flex-col sm:flex-row sm:items-end gap-4 mb-6">
-        <div className="flex-1 min-w-0">
-          <span className="kicker">ADMIN · COHORTS</span>
-          <div className="flex items-center gap-3 mt-0.5">
-            <span
-              className="inline-block w-3 h-3 rounded-full flex-shrink-0"
-              style={{ backgroundColor: cohortColor }}
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          {/* Cohort thumbnail hero */}
+          <div className="h-20 w-28 rounded-xl overflow-hidden flex-shrink-0 border border-white/20">
+            <EntityThumb
+              thumbPath={cohort.thumbPath}
+              seed={cohort.id}
+              title={cohort.name}
+              className="w-full h-full"
             />
-            <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight truncate">
-              {cohort.name}
-            </h1>
           </div>
-          <p className="mt-1 text-sm" style={{ color: "#CFE0D5" }}>
-            <span className="font-mono">{cohort.tag}</span>
-            {" · "}
-            {memberCount} member{memberCount !== 1 ? "s" : ""}
-          </p>
+          <div className="min-w-0">
+            <span className="kicker">ADMIN · COHORTS</span>
+            <div className="flex items-center gap-3 mt-0.5">
+              <span
+                className="inline-block w-3 h-3 rounded-full flex-shrink-0"
+                style={{ backgroundColor: cohortColor }}
+              />
+              <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight truncate">
+                {cohort.name}
+              </h1>
+            </div>
+            <p className="mt-1 text-sm" style={{ color: "#CFE0D5" }}>
+              <span className="font-mono">{cohort.tag}</span>
+              {" · "}
+              {memberCount} member{memberCount !== 1 ? "s" : ""}
+            </p>
+          </div>
         </div>
-        <button
-          onClick={() => router.push("/admin/cohorts")}
-          className="btn-secondary text-xs self-start sm:self-auto flex-shrink-0"
-        >
-          &larr; All Cohorts
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap self-start sm:self-auto">
+          {/* Thumbnail upload */}
+          <input
+            ref={thumbInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleThumbUpload(f);
+              e.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            disabled={thumbUploading}
+            onClick={() => thumbInputRef.current?.click()}
+            className="btn-secondary text-xs px-3 py-1.5"
+          >
+            {thumbUploading ? "Uploading…" : "Thumbnail"}
+          </button>
+          {thumbError && (
+            <p className="text-xs text-red-300">{thumbError}</p>
+          )}
+          <button
+            onClick={() => router.push("/admin/cohorts")}
+            className="btn-secondary text-xs"
+          >
+            &larr; All Cohorts
+          </button>
+        </div>
       </div>
 
       {error && (

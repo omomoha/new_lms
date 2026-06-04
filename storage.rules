@@ -38,6 +38,16 @@ service firebase.storage {
         && request.auth.token.role == "admin";
     }
 
+    // Thumbnails (courses and cohorts) — authenticated read; admin write
+    match /thumbnails/{allPaths=**} {
+      // All authenticated users can view thumbnails.
+      allow read: if request.auth != null;
+
+      // Only admins (custom claim) may upload, update, or delete thumbnails.
+      allow write: if request.auth != null
+        && request.auth.token.role == "admin";
+    }
+
     // Catch-all: deny everything else
     match /{allPaths=**} {
       allow read, write: if false;

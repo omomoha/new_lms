@@ -17,6 +17,7 @@ import type { Course } from "@/types";
 import AdminShell from "@/components/layout/AdminShell";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
+import { EntityThumb } from "@/components/ui/Thumb";
 
 const STATUS_VARIANT: Record<string, "default" | "success" | "warning" | "error"> = {
   draft: "warning",
@@ -136,8 +137,15 @@ export default function AdminCoursesPage() {
               href={`/admin/courses/${c.id}`}
               className="card hover:shadow-md transition-shadow flex flex-col gap-2 group overflow-hidden !p-0"
             >
-              {/* Ink → teal gradient top strip */}
-              <div className="h-1.5 w-full rounded-t-xl" style={{ background: "linear-gradient(to right, #13403A, #2C7A6B)" }} />
+              {/* Course thumbnail header strip */}
+              <div className="h-20 w-full rounded-t-xl overflow-hidden">
+                <EntityThumb
+                  thumbPath={c.thumbPath}
+                  seed={c.id}
+                  title={c.title}
+                  className="w-full h-full"
+                />
+              </div>
               <div className="px-4 sm:px-5 pb-4 sm:pb-5 pt-3 flex flex-col gap-2 flex-1">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-medium line-clamp-2 group-hover:text-brand-teal transition-colors" style={{ color: "#1E302C" }}>

@@ -21,6 +21,7 @@ import db from "@/lib/firebase/firestore";
 import type { Cohort, AppUser } from "@/types";
 import AdminShell from "@/components/layout/AdminShell";
 import { Spinner } from "@/components/ui/Spinner";
+import { EntityThumb } from "@/components/ui/Thumb";
 
 const COLORS = ["#2C7A6B", "#7FB069", "#13403A", "#C9772F", "#5E6E69"];
 
@@ -171,9 +172,18 @@ export default function CohortsPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {cohorts.map((c) => (
             <div key={c.id} className="card overflow-hidden !p-0">
-              {/* Color left-border chip at top */}
+              {/* Cohort thumbnail */}
+              <div className="h-20 w-full rounded-t-xl overflow-hidden">
+                <EntityThumb
+                  thumbPath={c.thumbPath}
+                  seed={c.id}
+                  title={c.name}
+                  className="w-full h-full"
+                />
+              </div>
+              {/* Color chip strip */}
               <div
-                className="h-2 w-full rounded-t-xl"
+                className="h-1.5 w-full"
                 style={{ backgroundColor: c.color || "#2C7A6B" }}
               />
               <div className="px-4 sm:px-5 py-4">

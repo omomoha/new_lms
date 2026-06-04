@@ -9,6 +9,7 @@ import type { Course, Enrollment } from "@/types";
 import LearnerShell from "@/components/layout/LearnerShell";
 import { Spinner } from "@/components/ui/Spinner";
 import { ProgressBar } from "@/components/ui/ProgressBar";
+import { EntityThumb } from "@/components/ui/Thumb";
 
 type CourseWithAccess = Course & { progressPct: number; hasAccess: boolean };
 
@@ -122,12 +123,14 @@ export default function LearnDashboard() {
                   href={`/learn/course/${c.id}`}
                   className="card hover:shadow-md transition-shadow group overflow-hidden !p-0"
                 >
-                  {/* Ink → teal gradient thumbnail */}
-                  <div
-                    className="w-full h-28 rounded-t-xl flex items-center justify-center"
-                    style={{ background: "linear-gradient(135deg, #13403A 0%, #2C7A6B 100%)" }}
-                  >
-                    <div className="w-10 h-10 rounded-sm rotate-45 opacity-30" style={{ backgroundColor: "#8FB85C" }} />
+                  {/* Course thumbnail */}
+                  <div className="w-full h-28 rounded-t-xl overflow-hidden">
+                    <EntityThumb
+                      thumbPath={c.thumbPath}
+                      seed={c.id}
+                      title={c.title}
+                      className="w-full h-full"
+                    />
                   </div>
                   <div className="px-4 sm:px-5 pb-4 pt-3">
                     <h2 className="font-medium mb-1 line-clamp-2 group-hover:text-brand-teal transition-colors" style={{ color: "#1E302C" }}>
@@ -152,12 +155,16 @@ export default function LearnDashboard() {
                   className="card overflow-hidden !p-0 opacity-70"
                   style={{ cursor: "default" }}
                 >
-                  {/* Muted grey thumbnail */}
-                  <div
-                    className="w-full h-28 rounded-t-xl flex items-center justify-center relative"
-                    style={{ background: "linear-gradient(135deg, #5E6E69 0%, #9EB3AD 100%)" }}
-                  >
-                    <div className="w-10 h-10 rounded-sm rotate-45 opacity-20" style={{ backgroundColor: "#fff" }} />
+                  {/* Locked course thumbnail — grayscale + dimmed */}
+                  <div className="w-full h-28 rounded-t-xl overflow-hidden relative">
+                    <div className="w-full h-full" style={{ filter: "grayscale(1) opacity(0.55)" }}>
+                      <EntityThumb
+                        thumbPath={c.thumbPath}
+                        seed={c.id}
+                        title={c.title}
+                        className="w-full h-full"
+                      />
+                    </div>
                     {/* Padlock badge */}
                     <span
                       className="absolute top-2 right-2 text-base leading-none px-2 py-1 rounded-full font-semibold"
