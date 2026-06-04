@@ -418,7 +418,7 @@ export default function LearnerAnalyticsPage() {
                   <span className="text-xs tabular-nums" style={{ color: "#5E6E69" }}>
                     Pre: {prePct}%
                   </span>
-                  <span className="text-xs" style={{ color: "#9EB3AD" }}>→</span>
+                  <span className="text-xs" style={{ color: "#5E6E69" }}>→</span>
                   <span className="text-xs tabular-nums" style={{ color: "#5E6E69" }}>
                     Post: {postPct}%
                   </span>

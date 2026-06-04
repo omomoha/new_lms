@@ -562,7 +562,7 @@ export default function CohortDetailPage() {
                         <tr key={ma.uid} style={{ borderBottom: "1px solid #F0F4F1" }}>
                           <td className="py-2 truncate max-w-[160px]" style={{ color: "#1E302C" }}>
                             <span className="font-medium">{ma.name}</span>
-                            <span className="ml-2 text-xs" style={{ color: "#9EB3AD" }}>{ma.email}</span>
+                            <span className="ml-2 text-xs" style={{ color: "#5E6E69" }}>{ma.email}</span>
                           </td>
                           <td className="py-2 text-right pr-2 tabular-nums font-semibold" style={{ color: "#13403A" }}>
                             {ma.avgPct}%

@@ -313,7 +313,7 @@ export default function AdminDashboardPage() {
                       </span>
                       <span
                         className="text-xs hidden sm:block"
-                        style={{ color: "#9EB3AD", fontSize: "10px" }}
+                        style={{ color: "#5E6E69", fontSize: "10px" }}
                       >
                         {d.date}
                       </span>

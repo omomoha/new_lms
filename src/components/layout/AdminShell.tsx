@@ -38,7 +38,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           </Link>
           <span className="text-white/30 hidden sm:block flex-shrink-0">|</span>
           {/* Nav — wraps on mobile */}
-          <nav className="flex flex-wrap gap-1 flex-1 min-w-0">
+          <nav aria-label="Admin navigation" className="flex flex-wrap gap-1 flex-1 min-w-0">
             {NAV.map((item) => {
               // Use exact match for the Dashboard root to avoid highlighting it
               // on every other /admin/* page.
@@ -50,6 +50,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-current={isActive ? "page" : undefined}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex-shrink-0 ${
                     isActive
                       ? "text-brand-primary font-semibold"
@@ -76,7 +77,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         </div>
       </header>
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6">
+      <main id="main-content" className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6">
         {children}
       </main>
     </div>

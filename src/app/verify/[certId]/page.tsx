@@ -84,7 +84,7 @@ export default function VerifyCertificatePage() {
                 <span aria-hidden="true">✓</span> Valid certificate
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide mb-1" style={{ color: "#9EB3AD" }}>
+                <p className="text-xs uppercase tracking-wide mb-1" style={{ color: "#5E6E69" }}>
                   Awarded to
                 </p>
                 <p className="font-serif-brand text-2xl" style={{ color: "#13403A" }}>
@@ -92,7 +92,7 @@ export default function VerifyCertificatePage() {
                 </p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide mb-1" style={{ color: "#9EB3AD" }}>
+                <p className="text-xs uppercase tracking-wide mb-1" style={{ color: "#5E6E69" }}>
                   For completing
                 </p>
                 <p className="text-lg font-medium" style={{ color: "#1E302C" }}>

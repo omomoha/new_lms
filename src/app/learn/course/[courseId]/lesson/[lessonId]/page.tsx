@@ -279,7 +279,7 @@ export default function LessonPage() {
   );
 
   const SidebarContent = () => (
-    <nav className="h-full overflow-y-auto p-4 space-y-4">
+    <nav aria-label="Course contents" className="h-full overflow-y-auto p-4 space-y-4">
       <div className="mb-2">
         <Link href={`/learn/course/${courseId}`} className="text-xs font-medium hover:underline" style={{ color: "#8FB85C" }}>
           ← {course.title}
@@ -342,22 +342,32 @@ export default function LessonPage() {
       <div className="lg:hidden flex items-center px-4 py-2 border-b bg-white" style={{ borderColor: "#DDE6DF" }}>
         <button
           onClick={() => setSidebarOpen((v) => !v)}
+          aria-expanded={sidebarOpen}
+          aria-controls="lesson-sidebar"
           className="text-sm font-semibold mr-3"
           style={{ color: "#13403A" }}
         >
-          ☰ Contents
+          <span aria-hidden="true">☰</span> Contents
         </button>
         <h2 className="text-sm font-medium truncate" style={{ color: "#1E302C" }}>{lesson.title}</h2>
       </div>
 
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
-        <div className="lg:hidden fixed inset-0 z-40 flex">
-          <div
-            className="fixed inset-0 bg-black/40"
+        <div
+          className="lg:hidden fixed inset-0 z-40 flex"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Course contents"
+          onKeyDown={(e) => { if (e.key === "Escape") setSidebarOpen(false); }}
+        >
+          <button
+            type="button"
+            className="fixed inset-0 bg-black/40 cursor-default"
+            aria-label="Close course contents"
             onClick={() => setSidebarOpen(false)}
           />
-          <aside className="relative w-72 bg-white shadow-xl">
+          <aside id="lesson-sidebar" className="relative w-72 bg-white shadow-xl">
             <SidebarContent />
           </aside>
         </div>
@@ -393,7 +403,7 @@ export default function LessonPage() {
                       allowFullScreen
                     />
                   </div>
-                  <p className="text-xs" style={{ color: "#9EB3AD" }}>
+                  <p className="text-xs" style={{ color: "#5E6E69" }}>
                     Video hosted externally — watch progress is not tracked automatically.
                   </p>
                   <NonVideoCompleteButton
@@ -521,7 +531,7 @@ export default function LessonPage() {
                     style={{ height: "70vh", borderColor: "#DDE6DF" }}
                     allowFullScreen
                   />
-                  <p className="text-xs mt-1" style={{ color: "#9EB3AD" }}>
+                  <p className="text-xs mt-1" style={{ color: "#5E6E69" }}>
                     Preview rendered via Microsoft Office Online.
                   </p>
                 </>

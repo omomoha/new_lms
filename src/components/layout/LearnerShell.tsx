@@ -35,7 +35,7 @@ export default function LearnerShell({ children }: { children: React.ReactNode }
           </button>
         </div>
       </header>
-      <main className="flex-1">{children}</main>
+      <main id="main-content" className="flex-1">{children}</main>
     </div>
   );
 }

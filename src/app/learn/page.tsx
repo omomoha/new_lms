@@ -179,9 +179,9 @@ export default function LearnDashboard() {
                       {c.title}
                     </h2>
                     {c.description && (
-                      <p className="text-sm line-clamp-2 mb-2" style={{ color: "#9EB3AD" }}>{c.description}</p>
+                      <p className="text-sm line-clamp-2 mb-2" style={{ color: "#5E6E69" }}>{c.description}</p>
                     )}
-                    <p className="text-xs" style={{ color: "#9EB3AD" }}>
+                    <p className="text-xs" style={{ color: "#5E6E69" }}>
                       Not in your cohort yet — ask your admin.
                     </p>
                   </div>

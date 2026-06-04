@@ -413,7 +413,7 @@ export default function RosterPage() {
                       {/* ── Cohort chips ── */}
                       <td className="px-3 py-3 max-w-[180px]">
                         {r.cohorts.length === 0 ? (
-                          <span className="text-xs" style={{ color: "#9EB3AD" }}>
+                          <span className="text-xs" style={{ color: "#5E6E69" }}>
                             —
                           </span>
                         ) : (
@@ -436,7 +436,7 @@ export default function RosterPage() {
                       {/* ── Progress: bar + % + completed/total ── */}
                       <td className="px-3 py-3" style={{ minWidth: "180px" }}>
                         {r.enrolledCount === 0 ? (
-                          <span className="text-xs" style={{ color: "#9EB3AD" }}>
+                          <span className="text-xs" style={{ color: "#5E6E69" }}>
                             No enrollments
                           </span>
                         ) : (
@@ -464,7 +464,7 @@ export default function RosterPage() {
                         {r.totalAttempts === 0 ? (
                           <span
                             className="text-xs"
-                            style={{ color: "#9EB3AD" }}
+                            style={{ color: "#5E6E69" }}
                             aria-label="No attempts"
                           >
                             —

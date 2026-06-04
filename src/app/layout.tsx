@@ -18,6 +18,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
+        {/* WCAG 2.4.1: keyboard users can bypass repeated navigation */}
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
