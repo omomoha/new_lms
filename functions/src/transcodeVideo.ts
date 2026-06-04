@@ -98,7 +98,9 @@ function safeUnlink(p: string | null): void {
 
 export const transcodeVideo = onObjectFinalized(
   {
-    region: "us-central1",
+    // Storage triggers MUST run in the bucket's region. This project's default
+    // bucket is in us-east1 (callables stay in us-central1 — that's fine).
+    region: "us-east1",
     memory: "2GiB",
     cpu: 2,
     timeoutSeconds: 540,
