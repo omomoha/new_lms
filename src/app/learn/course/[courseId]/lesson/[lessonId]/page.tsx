@@ -21,6 +21,7 @@ import type { Course, CourseModule, Lesson, LessonProgress, Enrollment, Assessme
 import LearnerShell from "@/components/layout/LearnerShell";
 import { VideoPlayer } from "@/components/video/VideoPlayer";
 import { Spinner } from "@/components/ui/Spinner";
+import { toEmbedUrl } from "@/lib/videoEmbed";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import QuizForm from "@/components/quiz/QuizForm";
 
@@ -373,7 +374,38 @@ export default function LessonPage() {
           <h1 className="font-serif-brand text-xl font-normal mb-4" style={{ color: "#13403A" }}>{lesson.title}</h1>
 
           {/* ── Video lesson ─────────────────────────────────────────────── */}
-          {lesson.type === "video" && lesson.videoPath && appUser ? (
+          {lesson.type === "video" && lesson.videoUrl ? (
+            (() => {
+              const embed = toEmbedUrl(lesson.videoUrl);
+              if (!embed) return (
+                <div className="w-full aspect-video rounded-xl flex items-center justify-center" style={{ backgroundColor: "#E7F1DE", color: "#5E6E69" }}>
+                  Invalid video URL.
+                </div>
+              );
+              return (
+                <div className="space-y-3">
+                  <div className="w-full rounded-xl overflow-hidden card !p-0" style={{ aspectRatio: "16/9" }}>
+                    <iframe
+                      src={embed.embedUrl}
+                      title={lesson.title}
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                  <p className="text-xs" style={{ color: "#9EB3AD" }}>
+                    Video hosted externally — watch progress is not tracked automatically.
+                  </p>
+                  <NonVideoCompleteButton
+                    completed={docCompleted}
+                    loading={markingComplete}
+                    error={markCompleteError}
+                    onMark={handleMarkNonVideoComplete}
+                  />
+                </div>
+              );
+            })()
+          ) : lesson.type === "video" && lesson.videoPath && appUser ? (
             allLessonIds.length > 0 && (
               <VideoPlayer
                 userId={appUser.uid}
@@ -384,7 +416,7 @@ export default function LessonPage() {
                 onComplete={handleLessonComplete}
               />
             )
-          ) : lesson.type === "video" && !lesson.videoPath ? (
+          ) : lesson.type === "video" && !lesson.videoPath && !lesson.videoUrl ? (
             <div className="w-full aspect-video rounded-xl flex items-center justify-center" style={{ backgroundColor: "#E7F1DE", color: "#5E6E69" }}>
               Video not yet uploaded.
             </div>

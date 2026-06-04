@@ -65,6 +65,7 @@ export interface Lesson {
   type: LessonType;
   order: number;
   videoPath?: string;      // Firebase Storage path (not URL) — use VideoService.getPlaybackUrl()
+  videoUrl?: string;       // External video URL (YouTube or Google Drive) — use toEmbedUrl() to embed
   textContent?: string;    // HTML or Markdown for text lessons
   fileUrl?: string;        // For slides/doc/lab: public download URL (legacy — prefer filePath)
   filePath?: string;       // Firebase Storage path for slides/doc/lab resources — use FileService.getResourceUrl()

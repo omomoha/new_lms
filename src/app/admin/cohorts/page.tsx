@@ -4,9 +4,11 @@
  * Cohorts — Admin
  * Create cohorts and see member counts. Courses are granted to cohorts from
  * the course builder; learners are added to cohorts from the Users page.
+ * Click "Manage →" on any cohort card to edit members and courses.
  */
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   collection,
   getDocs,
@@ -23,6 +25,7 @@ import { Spinner } from "@/components/ui/Spinner";
 const COLORS = ["#2C7A6B", "#7FB069", "#13403A", "#C9772F", "#5E6E69"];
 
 export default function CohortsPage() {
+  const router = useRouter();
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -42,11 +45,14 @@ export default function CohortsPage() {
       const counts: Record<string, number> = {};
       uSnap.docs.forEach((d) => {
         const u = d.data() as AppUser;
-        (u.cohortIds ?? []).forEach((cid) => {
+        const ids = Array.isArray(u.cohortIds) ? u.cohortIds : [];
+        ids.forEach((cid) => {
           counts[cid] = (counts[cid] ?? 0) + 1;
         });
       });
       setMemberCounts(counts);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load cohorts");
     } finally {
       setLoading(false);
     }
@@ -180,13 +186,21 @@ export default function CohortsPage() {
                   </span>
                   <span className="text-xs" style={{ color: "#5E6E69" }}>{c.tag}</span>
                 </div>
-                <div className="flex gap-6 text-sm" style={{ color: "#5E6E69" }}>
-                  <span>
-                    <b style={{ color: "#1E302C" }}>{memberCounts[c.id] ?? 0}</b> learners
-                  </span>
-                  <span>
-                    <b style={{ color: "#1E302C" }}>{c.courseIds?.length ?? 0}</b> courses
-                  </span>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex gap-6 text-sm" style={{ color: "#5E6E69" }}>
+                    <span>
+                      <b style={{ color: "#1E302C" }}>{memberCounts[c.id] ?? 0}</b> learners
+                    </span>
+                    <span>
+                      <b style={{ color: "#1E302C" }}>{c.courseIds?.length ?? 0}</b> courses
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => router.push(`/admin/cohorts/${c.id}`)}
+                    className="btn-secondary text-xs px-3 py-1.5 flex-shrink-0"
+                  >
+                    Manage &rarr;
+                  </button>
                 </div>
               </div>
             </div>

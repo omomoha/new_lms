@@ -27,6 +27,7 @@ export default function CoursePage() {
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   // Pre/Post assessment state
   const [preAssessment, setPreAssessment] = useState<Assessment | null>(null);
@@ -46,10 +47,24 @@ export default function CoursePage() {
         if (!courseSnap.exists()) { router.push("/learn"); return; }
         setCourse(courseSnap.data() as Course);
 
-        const modSnap = await getDocs(
-          query(collection(db, "courses", courseId, "modules"), orderBy("order"))
-        );
-        const mods = modSnap.docs.map((d) => d.data() as CourseModule);
+        // Modules and lessons are gated by cohort assignment in Firestore rules.
+        // If the learner is not in an assigned cohort, the subcollection read will
+        // be denied — detect that and show a clean locked state instead of a
+        // generic error.
+        let mods: CourseModule[] = [];
+        try {
+          const modSnap = await getDocs(
+            query(collection(db, "courses", courseId, "modules"), orderBy("order"))
+          );
+          mods = modSnap.docs.map((d) => d.data() as CourseModule);
+        } catch (err: unknown) {
+          const code = (err as { code?: string })?.code;
+          if (code === "permission-denied") {
+            setPermissionDenied(true);
+            return;
+          }
+          throw err;
+        }
         setModules(mods);
 
         const lMap: Record<string, Lesson[]> = {};
@@ -160,6 +175,27 @@ export default function CoursePage() {
           style={{ backgroundColor: "#FEE2E2", color: "#991B1B" }}
         >
           {loadError}
+        </div>
+      </div>
+    </LearnerShell>
+  );
+
+  if (permissionDenied) return (
+    <LearnerShell>
+      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+        <div
+          className="card inline-flex flex-col items-center gap-3 px-8 py-10"
+        >
+          <span style={{ fontSize: "2.5rem", lineHeight: 1 }}>🔒</span>
+          <h2 className="font-semibold text-base" style={{ color: "#13403A" }}>
+            {course?.title ?? "This course"} isn&apos;t assigned to your cohort yet.
+          </h2>
+          <p className="text-sm" style={{ color: "#5E6E69" }}>
+            Ask your admin to add you to the right cohort.
+          </p>
+          <Link href="/learn" className="btn-secondary text-sm mt-2">
+            ← Back to My Courses
+          </Link>
         </div>
       </div>
     </LearnerShell>

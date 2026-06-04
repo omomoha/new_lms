@@ -30,6 +30,7 @@ import AdminShell from "@/components/layout/AdminShell";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
 import QuizEditor from "@/components/quiz/QuizEditor";
+import { toEmbedUrl } from "@/lib/videoEmbed";
 
 const LESSON_TYPES: LessonType[] = ["video", "text", "slides", "doc", "lab", "quiz"];
 
@@ -54,6 +55,8 @@ export default function CourseBuilderPage() {
   const [lessonType, setLessonType] = useState<LessonType>("video");
   const [lessonText, setLessonText] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoUrlInput, setVideoUrlInput] = useState("");
+  const [videoUrlError, setVideoUrlError] = useState<string | null>(null);
   const [resourceFile, setResourceFile] = useState<File | null>(null);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -157,18 +160,30 @@ export default function CourseBuilderPage() {
   const handleAddLesson = async (e: React.FormEvent, moduleId: string) => {
     e.preventDefault();
     if (!lessonTitle.trim()) return;
-    setSaving(true); setError(null);
+    setSaving(true); setError(null); setVideoUrlError(null);
     try {
       const existingLessons = lessonMap[moduleId] ?? [];
       const order = existingLessons.length;
 
       let videoPath: string | undefined;
-      if (lessonType === "video" && videoFile) {
-        const path = `videos/${courseId}/${moduleId}/${Date.now()}_${videoFile.name}`;
-        videoPath = await videoService.uploadVideo(videoFile, path, (p) =>
-          setUploadPct(p.pct)
-        );
-        setUploadPct(null);
+      let videoUrl: string | undefined;
+
+      if (lessonType === "video") {
+        if (videoFile) {
+          const path = `videos/${courseId}/${moduleId}/${Date.now()}_${videoFile.name}`;
+          videoPath = await videoService.uploadVideo(videoFile, path, (p) =>
+            setUploadPct(p.pct)
+          );
+          setUploadPct(null);
+        } else if (videoUrlInput.trim()) {
+          const embedResult = toEmbedUrl(videoUrlInput.trim());
+          if (!embedResult) {
+            setVideoUrlError("Invalid URL — only YouTube and Google Drive links are accepted.");
+            setSaving(false);
+            return;
+          }
+          videoUrl = videoUrlInput.trim();
+        }
       }
 
       let filePath: string | undefined;
@@ -185,6 +200,7 @@ export default function CourseBuilderPage() {
         type: lessonType,
         order,
         ...(videoPath ? { videoPath } : {}),
+        ...(videoUrl ? { videoUrl } : {}),
         ...(filePath ? { filePath } : {}),
         ...(lessonType === "text" ? { textContent: lessonText } : {}),
       };
@@ -203,7 +219,7 @@ export default function CourseBuilderPage() {
       });
 
       const createdLessonId = ref.id;
-      setLessonTitle(""); setLessonText(""); setVideoFile(null); setResourceFile(null);
+      setLessonTitle(""); setLessonText(""); setVideoFile(null); setVideoUrlInput(""); setVideoUrlError(null); setResourceFile(null);
       setAddingLessonTo(null);
 
       // If quiz type, automatically open the quiz editor for the new lesson
@@ -477,13 +493,13 @@ export default function CourseBuilderPage() {
                   </select>
 
                   {lessonType === "video" && (
-                    <div>
+                    <div className="space-y-2">
                       <input
                         ref={fileRef}
                         type="file"
                         accept="video/*"
                         className="hidden"
-                        onChange={(e) => setVideoFile(e.target.files?.[0] ?? null)}
+                        onChange={(e) => { setVideoFile(e.target.files?.[0] ?? null); setVideoUrlInput(""); setVideoUrlError(null); }}
                       />
                       <button
                         type="button"
@@ -501,6 +517,21 @@ export default function CourseBuilderPage() {
                             />
                           </div>
                           <p className="text-xs mt-1" style={{ color: "#5E6E69" }}>{uploadPct}%</p>
+                        </div>
+                      )}
+                      {!videoFile && (
+                        <div>
+                          <p className="text-xs mb-1" style={{ color: "#5E6E69" }}>— or paste a YouTube / Google Drive link</p>
+                          <input
+                            type="url"
+                            className="input-field text-xs"
+                            placeholder="https://www.youtube.com/watch?v=… or https://drive.google.com/file/d/…"
+                            value={videoUrlInput}
+                            onChange={(e) => { setVideoUrlInput(e.target.value); setVideoUrlError(null); }}
+                          />
+                          {videoUrlError && (
+                            <p className="mt-1 text-xs text-red-600">{videoUrlError}</p>
+                          )}
                         </div>
                       )}
                     </div>

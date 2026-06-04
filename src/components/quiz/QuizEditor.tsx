@@ -14,11 +14,17 @@
  * In edit mode (existing != null), fetches assessmentKeys/{id} to prefill
  * correctIndex for each question. Falls back to 0 and shows an amber warning
  * if the key fetch fails.
+ *
+ * "Import from DOCX" button: reads a .docx file → base64 → calls the
+ * parseAssessmentDoc callable → replaces current question state with returned
+ * questions. Admin reviews and saves normally.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { doc, setDoc, getDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import db from "@/lib/firebase/firestore";
+import functions from "@/lib/firebase/functions";
 import type { Assessment, AssessmentKind, AssessmentQuestion } from "@/types";
 
 interface QuizEditorProps {
@@ -29,6 +35,18 @@ interface QuizEditorProps {
   existing?: Assessment | null;
   onSaved: (assessment: Assessment) => void;
   onCancel: () => void;
+}
+
+interface ParsedQuestion {
+  prompt: string;
+  type: "mcq" | "tf";
+  options: string[];
+  correctIndex: number;
+}
+
+interface ParseAssessmentDocResponse {
+  questions: ParsedQuestion[];
+  warnings: string[];
 }
 
 interface QuestionDraft {
@@ -81,6 +99,12 @@ export default function QuizEditor({
   const [error, setError] = useState<string | null>(null);
   // Set to true when we're in edit mode but the key fetch failed
   const [keyFetchWarning, setKeyFetchWarning] = useState(false);
+
+  // Import from DOCX
+  const importFileRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
+  const [showFormatGuide, setShowFormatGuide] = useState(false);
 
   // In edit mode, fetch the answer key to prefill correctIndex values
   useEffect(() => {
@@ -141,6 +165,69 @@ export default function QuizEditor({
       next[qIdx] = { ...q, options: newOpts, correctIndex: newCorrect };
       return next;
     });
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!e.target) return;
+    // Reset input so the same file can be re-selected after fixing
+    e.target.value = "";
+    if (!file) return;
+
+    setImporting(true);
+    setError(null);
+    setImportWarnings([]);
+
+    try {
+      // Read file as base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          // result is "data:<mime>;base64,<data>" — strip the prefix
+          const idx = result.indexOf(",");
+          resolve(idx !== -1 ? result.slice(idx + 1) : result);
+        };
+        reader.onerror = () => reject(new Error("Failed to read file."));
+        reader.readAsDataURL(file);
+      });
+
+      const parseDoc = httpsCallable<
+        { fileBase64: string; fileName: string },
+        ParseAssessmentDocResponse
+      >(functions, "parseAssessmentDoc");
+
+      const result = await parseDoc({ fileBase64: base64, fileName: file.name });
+      const { questions: parsed, warnings } = result.data;
+
+      if (parsed.length > 0) {
+        setQuestions(
+          parsed.map((pq) => ({
+            id: makeId(),
+            prompt: pq.prompt,
+            type: pq.type,
+            options: pq.options,
+            correctIndex: pq.correctIndex,
+          }))
+        );
+      }
+
+      if (warnings.length > 0) {
+        setImportWarnings(warnings);
+      }
+
+      if (parsed.length === 0 && warnings.length === 0) {
+        setError("No questions were found in the document.");
+      }
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to import document. Check the file format and try again."
+      );
+    } finally {
+      setImporting(false);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -222,6 +309,82 @@ export default function QuizEditor({
           />
         </div>
       </div>
+
+      {/* Import from DOCX */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          ref={importFileRef}
+          type="file"
+          accept=".docx"
+          className="hidden"
+          onChange={handleImport}
+        />
+        <button
+          type="button"
+          disabled={importing}
+          onClick={() => importFileRef.current?.click()}
+          className="btn-secondary text-xs flex items-center gap-1.5"
+        >
+          {importing ? "Importing…" : "Import from DOCX"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowFormatGuide((v) => !v)}
+          className="text-xs underline"
+          style={{ color: "#2C7A6B" }}
+        >
+          {showFormatGuide ? "Hide format guide" : "Format guide"}
+        </button>
+      </div>
+
+      {showFormatGuide && (
+        <div
+          className="rounded-lg p-3 text-xs space-y-1.5 border"
+          style={{ backgroundColor: "#E7F1DE", borderColor: "#8FB85C", color: "#1E302C" }}
+        >
+          <p className="font-semibold" style={{ color: "#13403A" }}>Expected DOCX layout</p>
+          <p>Separate each question block with a blank line. Supported formats:</p>
+          <pre
+            className="rounded p-2 mt-1 text-xs overflow-x-auto"
+            style={{ backgroundColor: "#F5F7F4", color: "#1E302C" }}
+          >{`Q1. What is the capital of France?
+A) Paris / B) London / C) Berlin / D) Madrid
+Answer: A
+
+Q2. JavaScript is a compiled language.
+A) True / B) False
+Answer: B
+
+Q3. Which of these is a JS framework?
+A) Django
+B) React
+C) Laravel
+D) Flask
+Ans: B`}</pre>
+          <ul className="list-disc list-inside space-y-0.5 mt-1" style={{ color: "#5E6E69" }}>
+            <li>Question line must start with <code>Q1.</code>, <code>Q2.</code>, etc.</li>
+            <li>Options: 2–6 choices prefixed A), B), … (slash-separated or one per line)</li>
+            <li>Answer line: <code>Answer: B</code> or <code>Ans: B</code> (case-insensitive)</li>
+            <li>True/False: use exactly <code>True</code> / <code>False</code> as options</li>
+            <li>Legacy .doc files must be saved as .docx first</li>
+          </ul>
+        </div>
+      )}
+
+      {/* Import warnings */}
+      {importWarnings.length > 0 && (
+        <div
+          className="rounded-lg p-3 text-xs space-y-1 border"
+          style={{ backgroundColor: "#FEF3C7", borderColor: "#F59E0B", color: "#92400E" }}
+        >
+          <p className="font-semibold">Import warnings ({importWarnings.length})</p>
+          <ul className="list-disc list-inside space-y-0.5">
+            {importWarnings.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Questions */}
       {questions.map((q, qIdx) => (

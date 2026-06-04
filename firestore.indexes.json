@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "enrollments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "courseId", "order": "ASCENDING" },
+        { "fieldPath": "progressPct", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "attempts",
       "queryScope": "COLLECTION",
       "fields": [

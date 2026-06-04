@@ -36,8 +36,21 @@ export default function UsersPage() {
         getDocs(collection(db, "users")),
         getDocs(collection(db, "cohorts")),
       ]);
-      setUsers(uSnap.docs.map((d) => ({ ...(d.data() as AppUser), uid: d.id })));
+      // Defensive: normalize cohortIds — hand-edited console docs can have it
+      // as a map or missing entirely, which would crash the chips render.
+      setUsers(
+        uSnap.docs.map((d) => {
+          const data = d.data() as AppUser;
+          return {
+            ...data,
+            uid: d.id,
+            cohortIds: Array.isArray(data.cohortIds) ? data.cohortIds : [],
+          };
+        })
+      );
       setCohorts(cSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Cohort)));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load users/cohorts");
     } finally {
       setLoading(false);
     }

@@ -65,14 +65,11 @@ service cloud.firestore {
     // ── courses/{id} ────────────────────────────────────────────────────────
     match /courses/{courseId} {
       // Admins have full access.
-      // Learners can read published courses that include one of their cohorts.
+      // Learners can read ANY published course doc (cohort gate lives on
+      // modules/lessons subcollections so unassigned learners see the course
+      // title/description but cannot access content).
       allow read: if isAdmin()
-        || (isLearner()
-            && resource.data.status == "published"
-            && resource.data.assignedCohortIds.hasAny(
-                 get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cohortIds
-               )
-           );
+        || (isLearner() && resource.data.status == "published");
       allow write: if isAdmin();
 
       // Fix #14: modules subcollection — enforce same cohort-assignment check
