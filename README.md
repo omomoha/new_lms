@@ -4,6 +4,52 @@ An internal Learning Management System built on Next.js 14 + Firebase, developed
 
 ---
 
+## Phase 3 Scope (current)
+
+- [x] **Hardened video delivery** — `getSignedVideoUrl` Cloud Function issues 2-hour V4 signed URLs after a server-side cohort/enrollment check; Storage rules now deny direct client reads on `videos/**` (the old long-lived download-token URLs are dead). Swapped in behind the `VideoService` seam — zero component changes.
+- [x] **Certificates** — auto-designed, auto-issued, auto-distributed:
+  - Issued automatically when a learner reaches 100% (and passes the post-assessment, if one exists) via Firestore triggers; also available on demand from the course page. Completion is **recomputed server-side** — the client-writable `progressPct` is never trusted.
+  - Branded PDF (pdf-lib) with verifiable ID; emailed to the learner via the Trigger Email extension (7-day download link) and downloadable in-app.
+  - **Admin-designable**: upload a custom A4-landscape PNG/JPG background per course (Course Builder → Certificate), choose dark/light overlay text, and preview a sample PDF. Falls back to a global template (`settings/certificate`) then the built-in design.
+  - Public verification at `/verify/{certId}` — no sign-in required.
+- [x] **Captions & transcripts** — upload a `.vtt` per video lesson (rendered as a `<track>`, CORS-safe via blob URL) plus an optional transcript panel below the player.
+- [x] **WCAG 2.1 AA pass** — skip link, landmarks, `aria-current` nav, keyboard-operable mobile sidebar with Escape-to-close, AA-compliant text contrast, `prefers-reduced-motion`.
+- [x] **Edge JWT verification** — middleware now cryptographically verifies the `__session` ID token (jose, Google JWKS, iss/aud/exp) and gates `/admin/*` on the verified `role` claim.
+- [x] **App Check** — reCAPTCHA v3 wiring, enabled by env (`NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY`); callables enforce via `ENFORCE_APPCHECK=true` in `functions/.env`.
+- [x] **Load testing** — k6 harness (`loadtest/`) targeting the 5k-learner profile.
+- [x] **Next.js security patch bisection** — now on **14.2.8**, the newest 14.2.x that builds (see Maintenance below).
+- [ ] SSO — deliberately excluded from this phase.
+
+### Phase 3 deployment prerequisites (one-time)
+
+1. **Signed URLs IAM grant** — V4 signing uses the IAM signBlob API; the functions runtime service account must be able to sign as itself:
+
+   ```bash
+   PROJECT_ID=andela-lms-dae5f
+   PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+   gcloud iam service-accounts add-iam-policy-binding \
+     $PROJECT_NUMBER-compute@developer.gserviceaccount.com \
+     --member="serviceAccount:$PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
+     --role="roles/iam.serviceAccountTokenCreator" --project=$PROJECT_ID
+   ```
+
+   Without this, `getSignedVideoUrl` / certificate downloads fail with an internal error.
+
+2. **functions/.env** — add:
+
+   ```
+   PUBLIC_APP_URL=https://andela-lms-dae5f.web.app   # used in certificate verify links + emails
+   ENFORCE_APPCHECK=false                             # flip to true only after App Check rollout
+   ```
+
+3. **Trigger Email extension** — certificate emails reuse the existing `mail/` collection setup (see bottom of this README). If the extension isn't installed, certificates still issue; only the email is skipped.
+
+4. **App Check rollout** (optional, recommended): register the web app with reCAPTCHA v3 in the Firebase console → set `NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY` (locally and in GitHub secrets) → monitor unenforced → then enforce in the console for Firestore/Storage and set `ENFORCE_APPCHECK=true` for functions. **Run load tests before enforcing.**
+
+5. Deploy indexes + rules with everything else: `firebase deploy` (CI does this on push).
+
+---
+
 ## Phase 1 Scope (this repo)
 
 - [x] Firebase Auth (email/password) with role-based access (admin / learner)
@@ -190,6 +236,12 @@ as a fallback for immediate UI rendering.
 ---
 
 ## Maintenance
+
+### Next.js security patch — bisection result (Phase 3)
+
+The deferred 14.2.35 upgrade was bisected: **14.2.9 is the first broken version** — Next's vendored App Router prerender runtime (`app-page.runtime.prod.js`) crashes with `Element type is invalid … got: undefined` on every route at build time with this app's React 18.3.1. The breakage is upstream (vendored runtime bump), not in app code, and persists through 14.2.35.
+
+**Current pin: `next@14.2.8` + `eslint-config-next@14.2.8`** — the newest version on the 14.2.x security line that builds. Remaining advisories between .9 and .35 stay on the books; the real fix is the planned **Next 15 migration** (which pairs with React 19), tracked as a future task. Do not bump 14.2.x past .8 without re-testing `npm run build`.
 
 ### June 2025 dependency upgrades
 
