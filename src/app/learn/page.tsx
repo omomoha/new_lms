@@ -34,8 +34,21 @@ export default function LearnDashboard() {
           (d) => ({ id: d.id, ...d.data() } as Course)
         );
 
-        // Determine access: learner belongs to at least one of the course's cohorts
-        const userCohortIds = appUser.cohortIds ?? [];
+        // Determine access with FRESH cohort membership — appUser is cached at
+        // sign-in, and an admin may have assigned cohorts since then. Fall back
+        // to the cached value if the fresh read fails.
+        let userCohortIds: string[] = Array.isArray(appUser.cohortIds)
+          ? appUser.cohortIds
+          : [];
+        try {
+          const meSnap = await getDoc(doc(db, "users", appUser.uid));
+          if (meSnap.exists()) {
+            const fresh = (meSnap.data() as { cohortIds?: unknown }).cohortIds;
+            if (Array.isArray(fresh)) userCohortIds = fresh as string[];
+          }
+        } catch {
+          /* keep cached membership */
+        }
 
         // Fetch enrollments for progress (only matters for accessible courses)
         const withAccessAndProgress = await Promise.all(
