@@ -12,7 +12,6 @@ import Link from "next/link";
 import {
   doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, where, serverTimestamp
 } from "firebase/firestore";
-import DOMPurify from "isomorphic-dompurify"; // Fix #6: sanitize text-lesson HTML
 import db from "@/lib/firebase/firestore";
 import { getResourceUrl, isPdf } from "@/lib/files";
 import { calcProgressPct } from "@/lib/progress";
@@ -24,6 +23,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { toEmbedUrl } from "@/lib/videoEmbed";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import QuizForm from "@/components/quiz/QuizForm";
+import TextLessonContent from "@/components/lessons/TextLessonContent";
 
 export default function LessonPage() {
   const params = useParams();
@@ -424,18 +424,15 @@ export default function LessonPage() {
           ) : /* ── Text lesson ──────────────────────────────────────────────── */
           lesson.type === "text" && lesson.textContent ? (
             <>
-              <div
-                className="prose prose-sm max-w-none mb-6"
-                dangerouslySetInnerHTML={{
-                  __html: DOMPurify.sanitize(lesson.textContent),
-                }}
-              />
-              <NonVideoCompleteButton
-                completed={docCompleted}
-                loading={markingComplete}
-                error={markCompleteError}
-                onMark={handleMarkNonVideoComplete}
-              />
+              <TextLessonContent content={lesson.textContent} />
+              <div className="mt-6">
+                <NonVideoCompleteButton
+                  completed={docCompleted}
+                  loading={markingComplete}
+                  error={markCompleteError}
+                  onMark={handleMarkNonVideoComplete}
+                />
+              </div>
             </>
 
           ) : /* ── Quiz lesson ──────────────────────────────────────────────── */
