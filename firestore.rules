@@ -31,7 +31,11 @@ service cloud.firestore {
     // accounts created before the syncRoleClaim trigger existed carry no role
     // claim at all, and learner is the lowest-privilege default anyway.
     function isLearner() {
-      return isAuthed() && request.auth.token.role != "admin";
+      // token.get() is REQUIRED here: accounts created before the claim-sync
+      // trigger have NO role key, and `token.role != "admin"` on a missing key
+      // throws inside rules — which evaluates as deny. get() with a default
+      // makes claimless users learners (lowest privilege) safely.
+      return isAuthed() && request.auth.token.get("role", "learner") != "admin";
     }
 
     // Is the caller operating on their own data?
