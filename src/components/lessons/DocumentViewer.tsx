@@ -81,7 +81,7 @@ export default function DocumentViewer({ filePath, fileUrl, title }: DocumentVie
 
   if (!source) {
     return (
-      <div className="card text-center py-12" style={{ color: "#5E6E69" }}>
+      <div className="card text-center py-12 text-brand-muted">
         <p className="text-sm">File not yet uploaded for this lesson.</p>
       </div>
     );
@@ -89,7 +89,7 @@ export default function DocumentViewer({ filePath, fileUrl, title }: DocumentVie
 
   if (error) {
     return (
-      <div className="card py-10 text-center text-sm" style={{ color: "#5E6E69" }}>
+      <div className="card py-10 text-center text-sm text-brand-muted">
         {error}
       </div>
     );
@@ -124,7 +124,7 @@ export default function DocumentViewer({ filePath, fileUrl, title }: DocumentVie
         style={{ height: "70vh", borderColor: "#DDE6DF" }}
         allowFullScreen
       />
-      <p className="text-xs mt-1" style={{ color: "#5E6E69" }}>
+      <p className="text-xs mt-1 text-brand-muted">
         Preview rendered via Microsoft Office Online.
       </p>
     </>
@@ -140,8 +140,7 @@ function ViewerSkeleton({ height }: { height: string }) {
       aria-label="Loading document"
     >
       <div
-        className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
-        style={{ borderColor: "#8FB85C" }}
+        className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin border-brand-accent"
       />
     </div>
   );

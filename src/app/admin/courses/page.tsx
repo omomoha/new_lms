@@ -81,13 +81,12 @@ export default function AdminCoursesPage() {
           <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight">
             Course Library
           </h1>
-          <p className="mt-1 text-sm" style={{ color: "#CFE0D5" }}>
+          <p className="mt-1 text-sm text-brand-mist">
             Build and publish courses, manage modules and lessons.
           </p>
         </div>
         <button
-          className="self-start sm:self-auto flex-shrink-0 px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
-          style={{ backgroundColor: "#8FB85C", color: "#13403A" }}
+          className="self-start sm:self-auto flex-shrink-0 px-4 py-2 rounded-lg font-semibold text-sm transition-colors bg-brand-accent text-brand-primary"
           onClick={() => setShowForm((v) => !v)}
         >
           {showForm ? "Cancel" : "+ New Course"}
@@ -97,7 +96,7 @@ export default function AdminCoursesPage() {
       {/* Create form */}
       {showForm && (
         <div className="card mb-6">
-          <h2 className="text-base font-medium mb-4" style={{ color: "#1E302C" }}>Create Course</h2>
+          <h2 className="text-base font-medium mb-4 text-brand-ink">Create Course</h2>
           {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
           <form onSubmit={handleCreate} className="space-y-3">
             <input
@@ -125,8 +124,8 @@ export default function AdminCoursesPage() {
       {loading ? (
         <div className="flex justify-center py-20"><Spinner /></div>
       ) : courses.length === 0 ? (
-        <div className="text-center py-20" style={{ color: "#5E6E69" }}>
-          <div className="mx-auto w-8 h-8 rounded-sm rotate-45 mb-4" style={{ backgroundColor: "#8FB85C" }} />
+        <div className="text-center py-20 text-brand-muted">
+          <div className="mx-auto w-8 h-8 rounded-sm rotate-45 mb-4 bg-brand-accent" />
           <p>No courses yet. Create your first one.</p>
         </div>
       ) : (
@@ -148,15 +147,15 @@ export default function AdminCoursesPage() {
               </div>
               <div className="px-4 sm:px-5 pb-4 sm:pb-5 pt-3 flex flex-col gap-2 flex-1">
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-medium line-clamp-2 group-hover:text-brand-teal transition-colors" style={{ color: "#1E302C" }}>
+                  <h3 className="font-medium line-clamp-2 group-hover:text-brand-teal transition-colors text-brand-ink">
                     {c.title}
                   </h3>
                   <Badge label={c.status} variant={STATUS_VARIANT[c.status]} />
                 </div>
                 {c.description && (
-                  <p className="text-sm line-clamp-2" style={{ color: "#5E6E69" }}>{c.description}</p>
+                  <p className="text-sm line-clamp-2 text-brand-muted">{c.description}</p>
                 )}
-                <p className="text-xs mt-auto" style={{ color: "#5E6E69" }}>
+                <p className="text-xs mt-auto text-brand-muted">
                   {c.moduleOrder?.length ?? 0} modules
                 </p>
               </div>

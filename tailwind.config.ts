@@ -18,6 +18,8 @@ const config: Config = {
           mint: "#E7F1DE",         // highlight bands / selected states
           ink: "#1E302C",          // body text
           muted: "#5E6E69",        // muted text
+          line: "#DDE6DF",         // hairline borders / dividers
+          mist: "#CFE0D5",         // muted text on dark hero bands
           // Legacy keys kept for backward compatibility
           dark: "#0C2C28",
           light: "#E7F1DE",

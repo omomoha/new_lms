@@ -100,7 +100,7 @@ export default function LearnDashboard() {
           <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight">
             Welcome back{appUser?.name ? `, ${appUser.name.split(" ")[0]}` : ""}
           </h1>
-          <p className="mt-1 text-sm" style={{ color: "#CFE0D5" }}>Continue your learning journey</p>
+          <p className="mt-1 text-sm text-brand-mist">Continue your learning journey</p>
         </div>
 
         {loadError && (
@@ -112,8 +112,8 @@ export default function LearnDashboard() {
         {loading ? (
           <div className="flex justify-center py-20"><Spinner /></div>
         ) : courses.length === 0 ? (
-          <div className="text-center py-20" style={{ color: "#5E6E69" }}>
-            <div className="mx-auto w-8 h-8 rounded-sm rotate-45 mb-4" style={{ backgroundColor: "#8FB85C" }} />
+          <div className="text-center py-20 text-brand-muted">
+            <div className="mx-auto w-8 h-8 rounded-sm rotate-45 mb-4 bg-brand-accent" />
             <p>No published courses available yet. Check back soon.</p>
           </div>
         ) : (
@@ -135,16 +135,16 @@ export default function LearnDashboard() {
                     />
                   </div>
                   <div className="px-4 sm:px-5 pb-4 pt-3">
-                    <h2 className="font-medium mb-1 line-clamp-2 group-hover:text-brand-teal transition-colors" style={{ color: "#1E302C" }}>
+                    <h2 className="font-medium mb-1 line-clamp-2 group-hover:text-brand-teal transition-colors text-brand-ink">
                       {c.title}
                     </h2>
                     {c.description && (
-                      <p className="text-sm line-clamp-2 mb-3" style={{ color: "#5E6E69" }}>{c.description}</p>
+                      <p className="text-sm line-clamp-2 mb-3 text-brand-muted">{c.description}</p>
                     )}
                     <div>
-                      <div className="flex justify-between text-xs mb-1" style={{ color: "#5E6E69" }}>
+                      <div className="flex justify-between text-xs mb-1 text-brand-muted">
                         <span>Progress</span>
-                        <span style={{ color: "#2C7A6B", fontWeight: 600 }}>{c.progressPct}%</span>
+                        <span className="text-brand-teal font-semibold">{c.progressPct}%</span>
                       </div>
                       <ProgressBar pct={c.progressPct} />
                     </div>
@@ -179,13 +179,13 @@ export default function LearnDashboard() {
                     </span>
                   </div>
                   <div className="px-4 sm:px-5 pb-4 pt-3">
-                    <h2 className="font-medium mb-1 line-clamp-2" style={{ color: "#5E6E69" }}>
+                    <h2 className="font-medium mb-1 line-clamp-2 text-brand-muted">
                       {c.title}
                     </h2>
                     {c.description && (
-                      <p className="text-sm line-clamp-2 mb-2" style={{ color: "#5E6E69" }}>{c.description}</p>
+                      <p className="text-sm line-clamp-2 mb-2 text-brand-muted">{c.description}</p>
                     )}
-                    <p className="text-xs" style={{ color: "#5E6E69" }}>
+                    <p className="text-xs text-brand-muted">
                       Not in your cohort yet — ask your admin.
                     </p>
                   </div>

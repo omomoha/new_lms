@@ -278,7 +278,7 @@ export default function RosterPage() {
           <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight">
             Learner Roster
           </h1>
-          <p className="mt-1 text-sm" style={{ color: "#CFE0D5" }}>
+          <p className="mt-1 text-sm text-brand-mist">
             Aggregated progress, assessments, and last activity across all
             learners.
           </p>
@@ -320,10 +320,9 @@ export default function RosterPage() {
           <Spinner />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-20" style={{ color: "#5E6E69" }}>
+        <div className="text-center py-20 text-brand-muted">
           <div
-            className="mx-auto w-8 h-8 rounded-sm rotate-45 mb-4"
-            style={{ backgroundColor: "#8FB85C" }}
+            className="mx-auto w-8 h-8 rounded-sm rotate-45 mb-4 bg-brand-accent"
           />
           <p>No learners found{search || cohortFilter ? " for this filter" : ""}.</p>
         </div>
@@ -342,14 +341,12 @@ export default function RosterPage() {
                     }}
                   >
                     <th
-                      className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide"
-                      style={{ color: "#5E6E69" }}
+                      className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide text-brand-muted"
                     >
                       Learner
                     </th>
                     <th
-                      className="text-left px-3 py-3 font-semibold text-xs uppercase tracking-wide"
-                      style={{ color: "#5E6E69" }}
+                      className="text-left px-3 py-3 font-semibold text-xs uppercase tracking-wide text-brand-muted"
                     >
                       Cohorts
                     </th>
@@ -360,14 +357,12 @@ export default function RosterPage() {
                       Progress
                     </th>
                     <th
-                      className="text-left px-3 py-3 font-semibold text-xs uppercase tracking-wide"
-                      style={{ color: "#5E6E69" }}
+                      className="text-left px-3 py-3 font-semibold text-xs uppercase tracking-wide text-brand-muted"
                     >
                       Assessments
                     </th>
                     <th
-                      className="text-left px-3 py-3 font-semibold text-xs uppercase tracking-wide"
-                      style={{ color: "#5E6E69" }}
+                      className="text-left px-3 py-3 font-semibold text-xs uppercase tracking-wide text-brand-muted"
                     >
                       Last Activity
                     </th>
@@ -390,8 +385,7 @@ export default function RosterPage() {
                       <td className="px-4 py-3 max-w-[200px]">
                         <div className="flex items-center gap-2 min-w-0">
                           <span
-                            className="font-medium truncate"
-                            style={{ color: "#1E302C" }}
+                            className="font-medium truncate text-brand-ink"
                             title={r.name || r.email}
                           >
                             {r.name || r.email}
@@ -402,8 +396,7 @@ export default function RosterPage() {
                           />
                         </div>
                         <p
-                          className="text-xs truncate mt-0.5"
-                          style={{ color: "#5E6E69" }}
+                          className="text-xs truncate mt-0.5 text-brand-muted"
                           title={r.email}
                         >
                           {r.email}
@@ -413,7 +406,7 @@ export default function RosterPage() {
                       {/* ── Cohort chips ── */}
                       <td className="px-3 py-3 max-w-[180px]">
                         {r.cohorts.length === 0 ? (
-                          <span className="text-xs" style={{ color: "#5E6E69" }}>
+                          <span className="text-xs text-brand-muted">
                             —
                           </span>
                         ) : (
@@ -436,7 +429,7 @@ export default function RosterPage() {
                       {/* ── Progress: bar + % + completed/total ── */}
                       <td className="px-3 py-3" style={{ minWidth: "180px" }}>
                         {r.enrolledCount === 0 ? (
-                          <span className="text-xs" style={{ color: "#5E6E69" }}>
+                          <span className="text-xs text-brand-muted">
                             No enrollments
                           </span>
                         ) : (
@@ -446,13 +439,12 @@ export default function RosterPage() {
                                 <ProgressBar pct={r.avgProgress} />
                               </div>
                               <span
-                                className="text-xs font-semibold tabular-nums w-10 text-right flex-shrink-0"
-                                style={{ color: "#13403A" }}
+                                className="text-xs font-semibold tabular-nums w-10 text-right flex-shrink-0 text-brand-primary"
                               >
                                 {r.avgProgress}%
                               </span>
                             </div>
-                            <p className="text-xs" style={{ color: "#5E6E69" }}>
+                            <p className="text-xs text-brand-muted">
                               {r.completedCount}/{r.enrolledCount} completed
                             </p>
                           </div>
@@ -463,8 +455,7 @@ export default function RosterPage() {
                       <td className="px-3 py-3">
                         {r.totalAttempts === 0 ? (
                           <span
-                            className="text-xs"
-                            style={{ color: "#5E6E69" }}
+                            className="text-xs text-brand-muted"
                             aria-label="No attempts"
                           >
                             —
@@ -472,8 +463,7 @@ export default function RosterPage() {
                         ) : (
                           <div className="flex flex-col gap-1">
                             <span
-                              className="text-xs tabular-nums"
-                              style={{ color: "#1E302C" }}
+                              className="text-xs tabular-nums text-brand-ink"
                             >
                               {r.totalAttempts} attempt
                               {r.totalAttempts !== 1 ? "s" : ""} ·{" "}
@@ -481,11 +471,7 @@ export default function RosterPage() {
                             </span>
                             {r.bestPostPct !== null && (
                               <span
-                                className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold tabular-nums w-fit"
-                                style={{
-                                  backgroundColor: "#E7F1DE",
-                                  color: "#13403A",
-                                }}
+                                className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold tabular-nums w-fit bg-brand-mint text-brand-primary"
                               >
                                 Best post: {r.bestPostPct}%
                               </span>
@@ -496,8 +482,7 @@ export default function RosterPage() {
 
                       {/* ── Last activity ── */}
                       <td
-                        className="px-3 py-3 text-xs tabular-nums whitespace-nowrap"
-                        style={{ color: "#5E6E69" }}
+                        className="px-3 py-3 text-xs tabular-nums whitespace-nowrap text-brand-muted"
                       >
                         {formatDateMs(r.lastActivityMs)}
                       </td>
@@ -522,7 +507,7 @@ export default function RosterPage() {
               className="flex items-center justify-between px-4 py-3 border-t text-xs"
               style={{ borderColor: "#DDE6DF", backgroundColor: "#F2F8EC" }}
             >
-              <span style={{ color: "#5E6E69" }}>
+              <span className="text-brand-muted">
                 {filtered.length === rows.length
                   ? `${rows.length} learner${rows.length !== 1 ? "s" : ""}`
                   : `${filtered.length} of ${rows.length} learners`}

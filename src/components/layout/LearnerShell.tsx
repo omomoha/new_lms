@@ -18,9 +18,9 @@ export default function LearnerShell({ children }: { children: React.ReactNode }
   if (loading || !user) return null;
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F5F7F4" }}>
-      <header className="sticky top-0 z-30 text-white h-14 flex items-center px-4 sm:px-6" style={{ backgroundColor: "#13403A" }}>
-        <Link href="/learn" className="font-bold text-lg flex-1" style={{ color: "#8FB85C" }}>
+    <div className="min-h-screen flex flex-col bg-brand-cream">
+      <header className="sticky top-0 z-30 text-white h-14 flex items-center px-4 sm:px-6 bg-brand-primary">
+        <Link href="/learn" className="font-bold text-lg flex-1 text-brand-accent">
           Andela <span className="text-white font-light">LMS</span>
         </Link>
         <div className="flex items-center gap-3">

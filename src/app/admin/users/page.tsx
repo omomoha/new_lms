@@ -105,7 +105,7 @@ export default function UsersPage() {
           <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight">
             Users
           </h1>
-          <p className="mt-1 text-sm" style={{ color: "#CFE0D5" }}>
+          <p className="mt-1 text-sm text-brand-mist">
             Toggle cohort chips to add or remove a learner from a cohort.
           </p>
         </div>
@@ -128,8 +128,8 @@ export default function UsersPage() {
           <Spinner />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-20" style={{ color: "#5E6E69" }}>
-          <div className="mx-auto w-8 h-8 rounded-sm rotate-45 mb-4" style={{ backgroundColor: "#8FB85C" }} />
+        <div className="text-center py-20 text-brand-muted">
+          <div className="mx-auto w-8 h-8 rounded-sm rotate-45 mb-4 bg-brand-accent" />
           <p>No users found.</p>
         </div>
       ) : (
@@ -141,7 +141,7 @@ export default function UsersPage() {
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium truncate" style={{ color: "#1E302C" }}>
+                  <span className="font-medium truncate text-brand-ink">
                     {u.name || u.email}
                   </span>
                   <Badge
@@ -149,11 +149,11 @@ export default function UsersPage() {
                     variant={u.role === "admin" ? "success" : "default"}
                   />
                 </div>
-                <p className="text-xs truncate" style={{ color: "#5E6E69" }}>{u.email}</p>
+                <p className="text-xs truncate text-brand-muted">{u.email}</p>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {cohorts.length === 0 ? (
-                  <span className="text-xs" style={{ color: "#5E6E69" }}>
+                  <span className="text-xs text-brand-muted">
                     No cohorts yet — create one first.
                   </span>
                 ) : (

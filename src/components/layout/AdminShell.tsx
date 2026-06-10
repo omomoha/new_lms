@@ -29,12 +29,12 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   if (loading || !user) return null;
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#F5F7F4" }}>
+    <div className="min-h-screen flex flex-col bg-brand-cream">
       {/* Top nav */}
-      <header className="sticky top-0 z-30 text-white" style={{ backgroundColor: "#13403A" }}>
+      <header className="sticky top-0 z-30 text-white bg-brand-primary">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3 flex-wrap sm:flex-nowrap">
           {/* Wordmark */}
-          <Link href="/admin" className="font-bold text-lg mr-2 flex-shrink-0" style={{ color: "#8FB85C" }}>
+          <Link href="/admin" className="font-bold text-lg mr-2 flex-shrink-0 text-brand-accent">
             Andela <span className="text-white font-light">LMS</span>
           </Link>
           <span className="text-white/30 hidden sm:block flex-shrink-0">|</span>

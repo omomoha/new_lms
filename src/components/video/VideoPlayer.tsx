@@ -299,9 +299,9 @@ export function VideoPlayer({
       {/* Quality picker — just below the frame, right-aligned */}
       <div className="flex items-center justify-end gap-2 mt-2">
         {qualityNote && (
-          <span className="text-xs" style={{ color: "#B45309" }}>{qualityNote}</span>
+          <span className="text-xs text-amber-700">{qualityNote}</span>
         )}
-        <label className="text-xs inline-flex items-center gap-1.5" style={{ color: "#5E6E69" }}>
+        <label className="text-xs inline-flex items-center gap-1.5 text-brand-muted">
           Quality
           <select
             value={quality}

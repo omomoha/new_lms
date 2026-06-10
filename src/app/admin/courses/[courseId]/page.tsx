@@ -533,7 +533,7 @@ export default function CourseBuilderPage() {
             {course.title}
           </h1>
           {course.description && (
-            <p className="mt-1 text-sm truncate" style={{ color: "#CFE0D5" }}>
+            <p className="mt-1 text-sm truncate text-brand-mist">
               {course.description}
             </p>
           )}
@@ -591,13 +591,13 @@ export default function CourseBuilderPage() {
 
       {/* Cohort access */}
       <div className="card mb-4">
-        <h2 className="font-medium mb-1" style={{ color: "#1E302C" }}>Cohort access</h2>
-        <p className="text-xs mb-3" style={{ color: "#5E6E69" }}>
+        <h2 className="font-medium mb-1 text-brand-ink">Cohort access</h2>
+        <p className="text-xs mb-3 text-brand-muted">
           Learners see this course only when it is <b>published</b> and assigned to
           one of their cohorts.
         </p>
         {cohorts.length === 0 ? (
-          <p className="text-xs" style={{ color: "#5E6E69" }}>
+          <p className="text-xs text-brand-muted">
             No cohorts yet — create one under the Cohorts tab.
           </p>
         ) : (
@@ -631,8 +631,8 @@ export default function CourseBuilderPage() {
 
       {/* Pre / Post assessments */}
       <div className="card mb-4">
-        <h2 className="font-medium mb-1" style={{ color: "#1E302C" }}>Pre / Post Assessments</h2>
-        <p className="text-xs mb-4" style={{ color: "#5E6E69" }}>
+        <h2 className="font-medium mb-1 text-brand-ink">Pre / Post Assessments</h2>
+        <p className="text-xs mb-4 text-brand-muted">
           Pre-assessment shown before learners start the course; post-assessment after 100% completion.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -640,9 +640,9 @@ export default function CourseBuilderPage() {
             const existing = kind === "pre" ? preAssessment : postAssessment;
             const isEditing = editingPrePost === kind;
             return (
-              <div key={kind} className="rounded-lg p-3 border" style={{ borderColor: "#DDE6DF", backgroundColor: "#F5F7F4" }}>
+              <div key={kind} className="rounded-lg p-3 border border-brand-line bg-brand-cream">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold uppercase" style={{ color: "#2C7A6B" }}>
+                  <span className="text-xs font-semibold uppercase text-brand-teal">
                     {kind === "pre" ? "Pre-course" : "Post-course"}
                   </span>
                   {existing && !isEditing && (
@@ -668,8 +668,8 @@ export default function CourseBuilderPage() {
                   />
                 ) : existing ? (
                   <div>
-                    <p className="text-sm font-medium" style={{ color: "#1E302C" }}>{existing.title}</p>
-                    <p className="text-xs mt-0.5" style={{ color: "#5E6E69" }}>
+                    <p className="text-sm font-medium text-brand-ink">{existing.title}</p>
+                    <p className="text-xs mt-0.5 text-brand-muted">
                       {existing.questions.length} question{existing.questions.length !== 1 ? "s" : ""} · pass: {existing.passMark}%
                     </p>
                   </div>
@@ -689,8 +689,8 @@ export default function CourseBuilderPage() {
 
       {/* Phase 3: Certificate template */}
       <div className="card mb-4">
-        <h2 className="font-medium mb-1" style={{ color: "#1E302C" }}>Certificate</h2>
-        <p className="text-xs mb-3" style={{ color: "#5E6E69" }}>
+        <h2 className="font-medium mb-1 text-brand-ink">Certificate</h2>
+        <p className="text-xs mb-3 text-brand-muted">
           Certificates are issued and emailed automatically when a learner completes the
           course (and passes the post-assessment, if one exists). By default they use the
           built-in Andela design — or upload your own background below. Use an A4-landscape
@@ -723,7 +723,7 @@ export default function CourseBuilderPage() {
           </button>
           {course.certTemplatePath && (
             <>
-              <label className="text-xs flex items-center gap-1.5" style={{ color: "#5E6E69" }}>
+              <label className="text-xs flex items-center gap-1.5 text-brand-muted">
                 Overlay text:
                 <select
                   className="input-field text-xs !py-1 !w-auto"
@@ -753,9 +753,9 @@ export default function CourseBuilderPage() {
           />
         </div>
         {/* Signature block */}
-        <div className="mt-4 pt-4 border-t" style={{ borderColor: "#DDE6DF" }}>
-          <h3 className="text-sm font-medium mb-1" style={{ color: "#1E302C" }}>Signature</h3>
-          <p className="text-xs mb-3" style={{ color: "#5E6E69" }}>
+        <div className="mt-4 pt-4 border-t border-brand-line">
+          <h3 className="text-sm font-medium mb-1 text-brand-ink">Signature</h3>
+          <p className="text-xs mb-3 text-brand-muted">
             Drawn at the bottom-left of every certificate for this course. Upload a signature
             image (transparent PNG recommended) and enter the signatory&apos;s name and title.
           </p>
@@ -815,8 +815,8 @@ export default function CourseBuilderPage() {
         {modules.map((mod) => (
           <div key={mod.id} className="card overflow-hidden !p-0">
             {/* Module header strip */}
-            <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b" style={{ borderColor: "#DDE6DF", backgroundColor: "#F5F7F4" }}>
-              <h2 className="font-semibold text-sm" style={{ color: "#13403A" }}>{mod.title}</h2>
+            <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-brand-line bg-brand-cream">
+              <h2 className="font-semibold text-sm text-brand-primary">{mod.title}</h2>
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => setAddingLessonTo(addingLessonTo === mod.id ? null : mod.id)}
@@ -841,10 +841,9 @@ export default function CourseBuilderPage() {
                   {(lessonMap[mod.id] ?? []).map((lesson) => (
                     <li key={lesson.id}>
                       <div
-                        className="flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg"
-                        style={{ backgroundColor: "#E7F1DE", color: "#1E302C" }}
+                        className="flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg bg-brand-mint text-brand-ink"
                       >
-                        <span className="text-xs font-semibold uppercase" style={{ color: "#2C7A6B" }}>
+                        <span className="text-xs font-semibold uppercase text-brand-teal">
                           {lesson.type}
                         </span>
                         <span className="flex-1">{lesson.title}</span>
@@ -862,8 +861,7 @@ export default function CourseBuilderPage() {
                         )}
                         <button
                           onClick={() => handleDeleteLesson(mod.id, lesson.id, lesson.title)}
-                          className="text-xs px-1.5 py-0.5 rounded hover:bg-red-50"
-                          style={{ color: "#B91C1C" }}
+                          className="text-xs px-1.5 py-0.5 rounded hover:bg-red-50 text-red-700"
                           aria-label={`Delete lesson ${lesson.title}`}
                           title="Delete lesson"
                         >
@@ -872,7 +870,7 @@ export default function CourseBuilderPage() {
                       </div>
                       {/* Inline quiz editor for this lesson */}
                       {lesson.type === "quiz" && editingQuizLessonId === lesson.id && (
-                        <div className="mt-2 pl-4 border-l-2" style={{ borderColor: "#8FB85C" }}>
+                        <div className="mt-2 pl-4 border-l-2 border-brand-accent">
                           <QuizEditor
                             courseId={courseId}
                             kind="quiz"
@@ -890,15 +888,14 @@ export default function CourseBuilderPage() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs mb-3" style={{ color: "#5E6E69" }}>No lessons yet.</p>
+                <p className="text-xs mb-3 text-brand-muted">No lessons yet.</p>
               )}
 
               {/* Add lesson form */}
               {addingLessonTo === mod.id && (
                 <form
                   onSubmit={(e) => handleAddLesson(e, mod.id)}
-                  className="border-t pt-3 space-y-3"
-                  style={{ borderColor: "#DDE6DF" }}
+                  className="border-t pt-3 space-y-3 border-brand-line"
                 >
                   <input
                     className="input-field"
@@ -935,18 +932,18 @@ export default function CourseBuilderPage() {
                       </button>
                       {uploadPct !== null && (
                         <div className="mt-2">
-                          <div className="w-full rounded-full h-1.5" style={{ backgroundColor: "#DDE6DF" }}>
+                          <div className="w-full rounded-full h-1.5 bg-brand-line">
                             <div
                               className="h-1.5 rounded-full transition-all"
                               style={{ width: `${uploadPct}%`, backgroundColor: "#8FB85C" }}
                             />
                           </div>
-                          <p className="text-xs mt-1" style={{ color: "#5E6E69" }}>{uploadPct}%</p>
+                          <p className="text-xs mt-1 text-brand-muted">{uploadPct}%</p>
                         </div>
                       )}
                       {!videoFile && (
                         <div>
-                          <p className="text-xs mb-1" style={{ color: "#5E6E69" }}>— or paste a YouTube / Google Drive link</p>
+                          <p className="text-xs mb-1 text-brand-muted">— or paste a YouTube / Google Drive link</p>
                           <input
                             type="url"
                             className="input-field text-xs"
@@ -962,7 +959,7 @@ export default function CourseBuilderPage() {
 
                       {/* Phase 3: captions + transcript (uploaded videos only) */}
                       {videoFile && (
-                        <div className="space-y-2 pt-1 border-t" style={{ borderColor: "#DDE6DF" }}>
+                        <div className="space-y-2 pt-1 border-t border-brand-line">
                           <input
                             ref={captionsFileRef}
                             type="file"
@@ -1008,13 +1005,13 @@ export default function CourseBuilderPage() {
                       </button>
                       {uploadPct !== null && (
                         <div className="mt-2">
-                          <div className="w-full rounded-full h-1.5" style={{ backgroundColor: "#DDE6DF" }}>
+                          <div className="w-full rounded-full h-1.5 bg-brand-line">
                             <div
                               className="h-1.5 rounded-full transition-all"
                               style={{ width: `${uploadPct}%`, backgroundColor: "#8FB85C" }}
                             />
                           </div>
-                          <p className="text-xs mt-1" style={{ color: "#5E6E69" }}>{uploadPct}%</p>
+                          <p className="text-xs mt-1 text-brand-muted">{uploadPct}%</p>
                         </div>
                       )}
                     </div>
@@ -1031,7 +1028,7 @@ export default function CourseBuilderPage() {
                   )}
 
                   {lessonType === "quiz" && (
-                    <p className="text-xs" style={{ color: "#5E6E69" }}>
+                    <p className="text-xs text-brand-muted">
                       After adding the lesson, use the &quot;Set Up Quiz&quot; button to define questions.
                     </p>
                   )}
@@ -1058,7 +1055,7 @@ export default function CourseBuilderPage() {
       {/* Add module */}
       {addingModule ? (
         <form onSubmit={handleAddModule} className="card mt-4 space-y-3">
-          <h2 className="font-medium" style={{ color: "#1E302C" }}>New Module</h2>
+          <h2 className="font-medium text-brand-ink">New Module</h2>
           <input
             className="input-field"
             placeholder="Module title"
@@ -1085,17 +1082,16 @@ export default function CourseBuilderPage() {
       )}
 
       {/* Danger zone */}
-      <div className="card mt-8" style={{ borderColor: "#FCA5A5" }}>
-        <h2 className="font-medium mb-1" style={{ color: "#B91C1C" }}>Danger zone</h2>
-        <p className="text-xs mb-3" style={{ color: "#5E6E69" }}>
+      <div className="card mt-8 border-red-300">
+        <h2 className="font-medium mb-1 text-red-700">Danger zone</h2>
+        <p className="text-xs mb-3 text-brand-muted">
           Permanently delete this course, all its modules and lessons, and remove it from
           assigned cohorts. Uploaded video/document files remain in storage.
         </p>
         <button
           onClick={handleDeleteCourse}
           disabled={deletingCourse}
-          className="btn-secondary text-xs !text-red-700"
-          style={{ borderColor: "#FCA5A5" }}
+          className="btn-secondary text-xs !text-red-700 border-red-300"
         >
           {deletingCourse ? "Deleting…" : "Delete this course"}
         </button>

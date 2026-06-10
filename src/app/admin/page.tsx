@@ -194,7 +194,7 @@ export default function AdminDashboardPage() {
           <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight">
             Dashboard
           </h1>
-          <p className="mt-1 text-sm" style={{ color: "#CFE0D5" }}>
+          <p className="mt-1 text-sm text-brand-mist">
             Live platform metrics — counts sourced from Firestore aggregates.
           </p>
         </div>
@@ -208,8 +208,7 @@ export default function AdminDashboardPage() {
 
       {error && (
         <div
-          className="rounded-lg p-4 text-sm mb-6"
-          style={{ backgroundColor: "#FEE2E2", color: "#991B1B" }}
+          className="rounded-lg p-4 text-sm mb-6 bg-red-100 text-red-800"
         >
           {error}
         </div>
@@ -220,8 +219,7 @@ export default function AdminDashboardPage() {
           {/* ── KPI stat cards ──────────────────────────────────────────────── */}
           <section className="mb-8">
             <h2
-              className="text-xs font-semibold uppercase tracking-widest mb-4"
-              style={{ color: "#5E6E69" }}
+              className="text-xs font-semibold uppercase tracking-widest mb-4 text-brand-muted"
             >
               Platform totals
             </h2>
@@ -240,19 +238,16 @@ export default function AdminDashboardPage() {
                 >
                   {/* Moss top rule */}
                   <div
-                    className="h-1 w-full flex-shrink-0"
-                    style={{ backgroundColor: "#8FB85C" }}
+                    className="h-1 w-full flex-shrink-0 bg-brand-accent"
                   />
                   <div className="px-4 py-4 flex flex-col gap-1">
                     <span
-                      className="font-serif-brand text-3xl font-semibold leading-none"
-                      style={{ color: "#13403A" }}
+                      className="font-serif-brand text-3xl font-semibold leading-none text-brand-primary"
                     >
                       {value !== null ? value.toLocaleString() : "—"}
                     </span>
                     <span
-                      className="text-xs font-medium uppercase tracking-wide"
-                      style={{ color: "#5E6E69" }}
+                      className="text-xs font-medium uppercase tracking-wide text-brand-muted"
                     >
                       {label}
                     </span>
@@ -266,8 +261,7 @@ export default function AdminDashboardPage() {
           <section className="mb-8">
             <div className="card">
               <h2
-                className="text-sm font-semibold mb-5"
-                style={{ color: "#1E302C" }}
+                className="text-sm font-semibold mb-5 text-brand-ink"
               >
                 Sign-ups — last 7 days
               </h2>
@@ -282,8 +276,7 @@ export default function AdminDashboardPage() {
                     >
                       {/* count label above bar */}
                       <span
-                        className="text-xs font-semibold"
-                        style={{ color: "#13403A" }}
+                        className="text-xs font-semibold text-brand-primary"
                       >
                         {d.count}
                       </span>
@@ -306,8 +299,7 @@ export default function AdminDashboardPage() {
                       </div>
                       {/* day label */}
                       <span
-                        className="text-xs font-medium"
-                        style={{ color: "#5E6E69" }}
+                        className="text-xs font-medium text-brand-muted"
                       >
                         {d.label}
                       </span>
@@ -328,20 +320,18 @@ export default function AdminDashboardPage() {
           <section className="mb-8">
             <div className="card">
               <h2
-                className="text-sm font-semibold mb-5"
-                style={{ color: "#1E302C" }}
+                className="text-sm font-semibold mb-5 text-brand-ink"
               >
                 Completions by course{" "}
                 <span
-                  className="text-xs font-normal ml-1"
-                  style={{ color: "#5E6E69" }}
+                  className="text-xs font-normal ml-1 text-brand-muted"
                 >
                   (top 10 by creation date, courses with enrollments)
                 </span>
               </h2>
 
               {completions.length === 0 ? (
-                <p className="text-sm" style={{ color: "#5E6E69" }}>
+                <p className="text-sm text-brand-muted">
                   No enrollments recorded yet.
                 </p>
               ) : (
@@ -359,8 +349,7 @@ export default function AdminDashboardPage() {
                       <div key={c.courseId} className="flex items-center gap-3">
                         {/* Course title */}
                         <span
-                          className="text-xs font-medium w-36 flex-shrink-0 truncate"
-                          style={{ color: "#1E302C" }}
+                          className="text-xs font-medium w-36 flex-shrink-0 truncate text-brand-ink"
                           title={c.title}
                         >
                           {c.title}
@@ -390,14 +379,12 @@ export default function AdminDashboardPage() {
                         </div>
                         {/* stats */}
                         <span
-                          className="text-xs w-24 flex-shrink-0 text-right tabular-nums"
-                          style={{ color: "#5E6E69" }}
+                          className="text-xs w-24 flex-shrink-0 text-right tabular-nums text-brand-muted"
                         >
                           {c.completed}/{c.enrolled} done
                         </span>
                         <span
-                          className="text-xs w-10 flex-shrink-0 text-right tabular-nums font-semibold"
-                          style={{ color: "#13403A" }}
+                          className="text-xs w-10 flex-shrink-0 text-right tabular-nums font-semibold text-brand-primary"
                         >
                           {c.enrolled > 0
                             ? Math.round(completedPct) + "%"

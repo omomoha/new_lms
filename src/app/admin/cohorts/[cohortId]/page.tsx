@@ -384,7 +384,7 @@ export default function CohortDetailPage() {
                 {cohort.name}
               </h1>
             </div>
-            <p className="mt-1 text-sm" style={{ color: "#CFE0D5" }}>
+            <p className="mt-1 text-sm text-brand-mist">
               <span className="font-mono">{cohort.tag}</span>
               {" · "}
               {memberCount} member{memberCount !== 1 ? "s" : ""}
@@ -432,7 +432,7 @@ export default function CohortDetailPage() {
 
       {/* ── Rename card ─────────────────────────────────────────────────────── */}
       <form onSubmit={handleRename} className="card mb-4 space-y-3">
-        <h2 className="font-medium" style={{ color: "#1E302C" }}>Rename cohort</h2>
+        <h2 className="font-medium text-brand-ink">Rename cohort</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <input
             className="input-field"
@@ -450,7 +450,7 @@ export default function CohortDetailPage() {
           />
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs" style={{ color: "#5E6E69" }}>Color:</span>
+          <span className="text-xs text-brand-muted">Color:</span>
           {COLORS.map((c) => (
             <button
               key={c}
@@ -485,12 +485,12 @@ export default function CohortDetailPage() {
 
       {/* ── Cohort Progress card ────────────────────────────────────────────── */}
       <div className="card mb-4">
-        <h2 className="font-medium mb-4" style={{ color: "#1E302C" }}>
+        <h2 className="font-medium mb-4 text-brand-ink">
           Cohort progress
         </h2>
 
         {courseAnalytics.length === 0 && memberAnalytics.length === 0 ? (
-          <p className="text-sm py-2" style={{ color: "#5E6E69" }}>
+          <p className="text-sm py-2 text-brand-muted">
             No assigned courses or members yet — assign courses and add members to see progress analytics.
           </p>
         ) : (
@@ -498,15 +498,14 @@ export default function CohortDetailPage() {
             {/* Per-course progress bars */}
             {courseAnalytics.length > 0 && (
               <div className="mb-5">
-                <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: "#5E6E69" }}>
+                <p className="text-xs font-semibold uppercase tracking-wide mb-3 text-brand-muted">
                   Course averages
                 </p>
                 <div className="flex flex-col gap-3">
                   {courseAnalytics.map((ca) => (
                     <div key={ca.courseId} className="flex items-center gap-3">
                       <span
-                        className="text-xs font-medium w-36 flex-shrink-0 truncate"
-                        style={{ color: "#1E302C" }}
+                        className="text-xs font-medium w-36 flex-shrink-0 truncate text-brand-ink"
                         title={ca.title}
                       >
                         {ca.title}
@@ -525,14 +524,12 @@ export default function CohortDetailPage() {
                         />
                       </div>
                       <span
-                        className="text-xs font-semibold w-10 flex-shrink-0 text-right tabular-nums"
-                        style={{ color: "#13403A" }}
+                        className="text-xs font-semibold w-10 flex-shrink-0 text-right tabular-nums text-brand-primary"
                       >
                         {ca.avgPct}%
                       </span>
                       <span
-                        className="text-xs w-24 flex-shrink-0 text-right tabular-nums"
-                        style={{ color: "#5E6E69" }}
+                        className="text-xs w-24 flex-shrink-0 text-right tabular-nums text-brand-muted"
                       >
                         {ca.completedCount}/{ca.memberCount} done
                       </span>
@@ -545,29 +542,29 @@ export default function CohortDetailPage() {
             {/* Per-member compact table */}
             {memberAnalytics.length > 0 && (
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#5E6E69" }}>
+                <p className="text-xs font-semibold uppercase tracking-wide mb-2 text-brand-muted">
                   Member overview
                 </p>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr style={{ borderBottom: "1px solid #DDE6DF" }}>
-                        <th className="text-left pb-2 font-semibold" style={{ color: "#5E6E69" }}>Name</th>
-                        <th className="text-right pb-2 font-semibold pr-2" style={{ color: "#5E6E69" }}>Avg %</th>
-                        <th className="text-right pb-2 font-semibold" style={{ color: "#5E6E69" }}>Completed</th>
+                        <th className="text-left pb-2 font-semibold text-brand-muted">Name</th>
+                        <th className="text-right pb-2 font-semibold pr-2 text-brand-muted">Avg %</th>
+                        <th className="text-right pb-2 font-semibold text-brand-muted">Completed</th>
                       </tr>
                     </thead>
                     <tbody>
                       {memberAnalytics.map((ma) => (
                         <tr key={ma.uid} style={{ borderBottom: "1px solid #F0F4F1" }}>
-                          <td className="py-2 truncate max-w-[160px]" style={{ color: "#1E302C" }}>
+                          <td className="py-2 truncate max-w-[160px] text-brand-ink">
                             <span className="font-medium">{ma.name}</span>
-                            <span className="ml-2 text-xs" style={{ color: "#5E6E69" }}>{ma.email}</span>
+                            <span className="ml-2 text-xs text-brand-muted">{ma.email}</span>
                           </td>
-                          <td className="py-2 text-right pr-2 tabular-nums font-semibold" style={{ color: "#13403A" }}>
+                          <td className="py-2 text-right pr-2 tabular-nums font-semibold text-brand-primary">
                             {ma.avgPct}%
                           </td>
-                          <td className="py-2 text-right tabular-nums" style={{ color: "#5E6E69" }}>
+                          <td className="py-2 text-right tabular-nums text-brand-muted">
                             {ma.completedCount}/{courseAnalytics.length}
                           </td>
                         </tr>
@@ -585,16 +582,15 @@ export default function CohortDetailPage() {
       <div className="card mb-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
           <div className="flex-1">
-            <h2 className="font-medium" style={{ color: "#1E302C" }}>
+            <h2 className="font-medium text-brand-ink">
               Members
               <span
-                className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold"
-                style={{ backgroundColor: "#E7F1DE", color: "#13403A" }}
+                className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-brand-mint text-brand-primary"
               >
                 {memberCount}
               </span>
             </h2>
-            <p className="text-xs mt-0.5" style={{ color: "#5E6E69" }}>
+            <p className="text-xs mt-0.5 text-brand-muted">
               Toggle a user chip to add or remove them from this cohort.
             </p>
           </div>
@@ -607,7 +603,7 @@ export default function CohortDetailPage() {
         </div>
 
         {filteredUsers.length === 0 ? (
-          <p className="text-sm py-4 text-center" style={{ color: "#5E6E69" }}>
+          <p className="text-sm py-4 text-center text-brand-muted">
             No users found.
           </p>
         ) : (
@@ -626,8 +622,7 @@ export default function CohortDetailPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span
-                        className="font-medium text-sm truncate"
-                        style={{ color: "#1E302C" }}
+                        className="font-medium text-sm truncate text-brand-ink"
                       >
                         {u.name || u.email}
                       </span>
@@ -636,7 +631,7 @@ export default function CohortDetailPage() {
                         variant={u.role === "admin" ? "success" : "default"}
                       />
                     </div>
-                    <p className="text-xs truncate" style={{ color: "#5E6E69" }}>
+                    <p className="text-xs truncate text-brand-muted">
                       {u.email}
                     </p>
                   </div>
@@ -669,23 +664,22 @@ export default function CohortDetailPage() {
       {/* ── Courses card ────────────────────────────────────────────────────── */}
       <div className="card">
         <div className="mb-4">
-          <h2 className="font-medium" style={{ color: "#1E302C" }}>
+          <h2 className="font-medium text-brand-ink">
             Courses
             <span
-              className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold"
-              style={{ backgroundColor: "#E7F1DE", color: "#13403A" }}
+              className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-brand-mint text-brand-primary"
             >
               {(cohort.courseIds ?? []).length}
             </span>
           </h2>
-          <p className="text-xs mt-0.5" style={{ color: "#5E6E69" }}>
+          <p className="text-xs mt-0.5 text-brand-muted">
             Toggle a course to grant or revoke access for this cohort.
             Changes mirror the course builder&apos;s cohort access panel.
           </p>
         </div>
 
         {courses.length === 0 ? (
-          <p className="text-sm py-4 text-center" style={{ color: "#5E6E69" }}>
+          <p className="text-sm py-4 text-center text-brand-muted">
             No courses found. Create courses first.
           </p>
         ) : (
@@ -704,8 +698,7 @@ export default function CohortDetailPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span
-                        className="font-medium text-sm truncate"
-                        style={{ color: "#1E302C" }}
+                        className="font-medium text-sm truncate text-brand-ink"
                       >
                         {course.title}
                       </span>
@@ -722,8 +715,7 @@ export default function CohortDetailPage() {
                     </div>
                     {course.description && (
                       <p
-                        className="text-xs truncate"
-                        style={{ color: "#5E6E69" }}
+                        className="text-xs truncate text-brand-muted"
                       >
                         {course.description}
                       </p>

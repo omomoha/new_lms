@@ -126,7 +126,7 @@ export function PairedBarChart({
         })}
       </svg>
       {/* legend */}
-      <div className="flex items-center gap-4 mt-1 text-xs" style={{ color: "#5E6E69" }}>
+      <div className="flex items-center gap-4 mt-1 text-xs text-brand-muted">
         <span className="inline-flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: A_COLOR }} aria-hidden="true" />
           {aLabel}

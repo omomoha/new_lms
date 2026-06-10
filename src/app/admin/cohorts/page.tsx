@@ -97,11 +97,11 @@ export default function CohortsPage() {
           <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight">
             Cohorts
           </h1>
-          <p className="mt-1 text-sm" style={{ color: "#CFE0D5" }}>
+          <p className="mt-1 text-sm text-brand-mist">
             Group learners; assign courses per cohort from the course builder.
           </p>
         </div>
-        <button onClick={() => setAdding(!adding)} className="self-start sm:self-auto flex-shrink-0 px-4 py-2 rounded-lg font-semibold text-sm transition-colors" style={{ backgroundColor: "#8FB85C", color: "#13403A" }}>
+        <button onClick={() => setAdding(!adding)} className="self-start sm:self-auto flex-shrink-0 px-4 py-2 rounded-lg font-semibold text-sm transition-colors bg-brand-accent text-brand-primary">
           + New cohort
         </button>
       </div>
@@ -114,7 +114,7 @@ export default function CohortsPage() {
 
       {adding && (
         <form onSubmit={handleCreate} className="card mb-6 space-y-3">
-          <h2 className="font-medium" style={{ color: "#1E302C" }}>New cohort</h2>
+          <h2 className="font-medium text-brand-ink">New cohort</h2>
           <input
             className="input-field"
             placeholder="Cohort name (e.g. Backend Guild)"
@@ -130,7 +130,7 @@ export default function CohortsPage() {
             required
           />
           <div className="flex items-center gap-2">
-            <span className="text-xs" style={{ color: "#5E6E69" }}>Color:</span>
+            <span className="text-xs text-brand-muted">Color:</span>
             {COLORS.map((c) => (
               <button
                 key={c}
@@ -165,8 +165,8 @@ export default function CohortsPage() {
           <Spinner />
         </div>
       ) : cohorts.length === 0 ? (
-        <div className="text-center py-20" style={{ color: "#5E6E69" }}>
-          <div className="mx-auto w-8 h-8 rounded-sm rotate-45 mb-4" style={{ backgroundColor: "#8FB85C" }} />
+        <div className="text-center py-20 text-brand-muted">
+          <div className="mx-auto w-8 h-8 rounded-sm rotate-45 mb-4 bg-brand-accent" />
           <p>No cohorts yet. Create your first one.</p>
         </div>
       ) : (
@@ -195,15 +195,15 @@ export default function CohortsPage() {
                   >
                     {c.name}
                   </span>
-                  <span className="text-xs" style={{ color: "#5E6E69" }}>{c.tag}</span>
+                  <span className="text-xs text-brand-muted">{c.tag}</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <div className="flex gap-6 text-sm" style={{ color: "#5E6E69" }}>
+                  <div className="flex gap-6 text-sm text-brand-muted">
                     <span>
-                      <b style={{ color: "#1E302C" }}>{memberCounts[c.id] ?? 0}</b> learners
+                      <b className="text-brand-ink">{memberCounts[c.id] ?? 0}</b> learners
                     </span>
                     <span>
-                      <b style={{ color: "#1E302C" }}>{c.courseIds?.length ?? 0}</b> courses
+                      <b className="text-brand-ink">{c.courseIds?.length ?? 0}</b> courses
                     </span>
                   </div>
                   <button

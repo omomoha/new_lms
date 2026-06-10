@@ -211,7 +211,7 @@ export default function AssessmentInsightsPage() {
         <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight">
           Assessment Insights
         </h1>
-        <p className="text-sm mt-1" style={{ color: "#CFE0D5" }}>
+        <p className="text-sm mt-1 text-brand-mist">
           Pre → post improvement by cohort and by learner. Baseline = first pre-assessment
           attempt; outcome = latest post-assessment attempt.
         </p>
@@ -225,7 +225,7 @@ export default function AssessmentInsightsPage() {
 
       {/* Filters */}
       <div className="card mb-4 flex flex-col sm:flex-row gap-3 sm:items-end">
-        <label className="text-xs font-semibold flex-1" style={{ color: "#5E6E69" }}>
+        <label className="text-xs font-semibold flex-1 text-brand-muted">
           Cohort
           <select
             className="input-field mt-1"
@@ -238,7 +238,7 @@ export default function AssessmentInsightsPage() {
             ))}
           </select>
         </label>
-        <label className="text-xs font-semibold flex-1" style={{ color: "#5E6E69" }}>
+        <label className="text-xs font-semibold flex-1 text-brand-muted">
           Learner (individual view)
           <select
             className="input-field mt-1"
@@ -254,7 +254,7 @@ export default function AssessmentInsightsPage() {
       </div>
 
       {visibleRows.length === 0 ? (
-        <div className="card text-center py-14 text-sm" style={{ color: "#5E6E69" }}>
+        <div className="card text-center py-14 text-sm text-brand-muted">
           No assessment attempts yet for this selection. Insights appear once learners
           take pre/post assessments.
         </div>
@@ -287,11 +287,11 @@ export default function AssessmentInsightsPage() {
               },
             ].map((kpi) => (
               <div key={kpi.label} className="card !py-4">
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#5E6E69" }}>
+                <p className="text-xs font-semibold uppercase tracking-wide text-brand-muted">
                   {kpi.label}
                 </p>
-                <p className="font-serif-brand text-2xl mt-1" style={{ color: "#13403A" }}>{kpi.value}</p>
-                <p className="text-xs mt-0.5" style={{ color: "#5E6E69" }}>{kpi.sub}</p>
+                <p className="font-serif-brand text-2xl mt-1 text-brand-primary">{kpi.value}</p>
+                <p className="text-xs mt-0.5 text-brand-muted">{kpi.sub}</p>
               </div>
             ))}
           </div>
@@ -299,7 +299,7 @@ export default function AssessmentInsightsPage() {
           {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
             <div className="card">
-              <h2 className="font-medium mb-3" style={{ color: "#1E302C" }}>
+              <h2 className="font-medium mb-3 text-brand-ink">
                 Average score — pre vs post (%)
               </h2>
               <PairedBarChart
@@ -312,7 +312,7 @@ export default function AssessmentInsightsPage() {
               />
             </div>
             <div className="card">
-              <h2 className="font-medium mb-3" style={{ color: "#1E302C" }}>
+              <h2 className="font-medium mb-3 text-brand-ink">
                 Average time to complete — pre vs post
               </h2>
               {durationChart.length > 0 ? (
@@ -324,7 +324,7 @@ export default function AssessmentInsightsPage() {
                   formatValue={fmtDur}
                 />
               ) : (
-                <p className="text-sm py-8 text-center" style={{ color: "#5E6E69" }}>
+                <p className="text-sm py-8 text-center text-brand-muted">
                   No timing data yet — durations are recorded for attempts made from now on.
                 </p>
               )}
@@ -333,15 +333,15 @@ export default function AssessmentInsightsPage() {
 
           {/* Individual table */}
           <div className="card overflow-hidden !p-0">
-            <div className="px-4 sm:px-5 py-3 border-b" style={{ borderColor: "#DDE6DF", backgroundColor: "#F5F7F4" }}>
-              <h2 className="font-semibold text-sm" style={{ color: "#13403A" }}>
+            <div className="px-4 sm:px-5 py-3 border-b border-brand-line bg-brand-cream">
+              <h2 className="font-semibold text-sm text-brand-primary">
                 Individual results {learnerFilter !== "all" && "— selected learner"}
               </h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs uppercase tracking-wide" style={{ color: "#5E6E69" }}>
+                  <tr className="text-left text-xs uppercase tracking-wide text-brand-muted">
                     <th className="px-4 py-2">Learner</th>
                     <th className="px-4 py-2">Course</th>
                     <th className="px-4 py-2 text-right">Pre</th>
@@ -356,22 +356,22 @@ export default function AssessmentInsightsPage() {
                     .slice()
                     .sort((a, b) => (b.delta ?? -999) - (a.delta ?? -999))
                     .map((r) => (
-                      <tr key={r.uid + r.courseId} className="border-t" style={{ borderColor: "#DDE6DF" }}>
+                      <tr key={r.uid + r.courseId} className="border-t border-brand-line">
                         <td className="px-4 py-2">
-                          <Link href={`/admin/users/${r.uid}`} className="hover:underline" style={{ color: "#13403A" }}>
+                          <Link href={`/admin/users/${r.uid}`} className="hover:underline text-brand-primary">
                             {r.name}
                           </Link>
                         </td>
-                        <td className="px-4 py-2" style={{ color: "#5E6E69" }}>{r.courseTitle}</td>
+                        <td className="px-4 py-2 text-brand-muted">{r.courseTitle}</td>
                         <td className="px-4 py-2 text-right">{r.prePct != null ? `${Math.round(r.prePct)}%` : "—"}</td>
-                        <td className="px-4 py-2 text-right font-medium" style={{ color: "#13403A" }}>
+                        <td className="px-4 py-2 text-right font-medium text-brand-primary">
                           {r.postPct != null ? `${Math.round(r.postPct)}%` : "—"}
                         </td>
                         <td className="px-4 py-2 text-right"><DeltaBadge delta={r.delta} /></td>
-                        <td className="px-4 py-2 text-right" style={{ color: "#5E6E69" }}>
+                        <td className="px-4 py-2 text-right text-brand-muted">
                           {r.preDur != null ? fmtDur(r.preDur) : "—"}
                         </td>
-                        <td className="px-4 py-2 text-right" style={{ color: "#5E6E69" }}>
+                        <td className="px-4 py-2 text-right text-brand-muted">
                           {r.postDur != null ? fmtDur(r.postDur) : "—"}
                         </td>
                       </tr>

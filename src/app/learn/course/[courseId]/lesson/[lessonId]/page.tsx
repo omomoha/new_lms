@@ -255,8 +255,7 @@ export default function LessonPage() {
     <LearnerShell>
       <div className="max-w-2xl mx-auto px-4 py-10">
         <div
-          className="rounded-lg p-4 text-sm"
-          style={{ backgroundColor: "#FEE2E2", color: "#991B1B" }}
+          className="rounded-lg p-4 text-sm bg-red-100 text-red-800"
         >
           {loadError}
         </div>
@@ -273,12 +272,12 @@ export default function LessonPage() {
   const SidebarContent = () => (
     <nav aria-label="Course contents" className="h-full overflow-y-auto p-4 space-y-4">
       <div className="mb-2">
-        <Link href={`/learn/course/${courseId}`} className="text-xs font-medium hover:underline" style={{ color: "#8FB85C" }}>
+        <Link href={`/learn/course/${courseId}`} className="text-xs font-medium hover:underline text-brand-accent">
           ← {course.title}
         </Link>
         {enrollment && (
           <div className="mt-2">
-            <div className="flex justify-between text-xs mb-1" style={{ color: "#5E6E69" }}>
+            <div className="flex justify-between text-xs mb-1 text-brand-muted">
               <span>Progress</span><span>{enrollment.progressPct}%</span>
             </div>
             <ProgressBar pct={enrollment.progressPct} />
@@ -287,7 +286,7 @@ export default function LessonPage() {
       </div>
       {modules.map((mod) => (
         <div key={mod.id}>
-          <p className="text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: "#5E6E69" }}>
+          <p className="text-xs font-bold uppercase tracking-wide mb-1.5 text-brand-muted">
             {mod.title}
           </p>
           <ul className="space-y-0.5">
@@ -331,17 +330,16 @@ export default function LessonPage() {
   return (
     <LearnerShell>
       {/* Mobile header with sidebar toggle */}
-      <div className="lg:hidden flex items-center px-4 py-2 border-b bg-white" style={{ borderColor: "#DDE6DF" }}>
+      <div className="lg:hidden flex items-center px-4 py-2 border-b bg-white border-brand-line">
         <button
           onClick={() => setSidebarOpen((v) => !v)}
           aria-expanded={sidebarOpen}
           aria-controls="lesson-sidebar"
-          className="text-sm font-semibold mr-3"
-          style={{ color: "#13403A" }}
+          className="text-sm font-semibold mr-3 text-brand-primary"
         >
           <span aria-hidden="true">☰</span> Contents
         </button>
-        <h2 className="text-sm font-medium truncate" style={{ color: "#1E302C" }}>{lesson.title}</h2>
+        <h2 className="text-sm font-medium truncate text-brand-ink">{lesson.title}</h2>
       </div>
 
       {/* Mobile sidebar overlay */}
@@ -367,20 +365,20 @@ export default function LessonPage() {
 
       <div className="flex h-[calc(100vh-7rem)]">
         {/* Desktop sidebar */}
-        <aside className="hidden lg:flex w-72 flex-shrink-0 border-r bg-white flex-col" style={{ borderColor: "#DDE6DF" }}>
+        <aside className="hidden lg:flex w-72 flex-shrink-0 border-r bg-white flex-col border-brand-line">
           <SidebarContent />
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-6" style={{ backgroundColor: "#F5F7F4" }}>
-          <h1 className="font-serif-brand text-xl font-normal mb-4" style={{ color: "#13403A" }}>{lesson.title}</h1>
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 bg-brand-cream">
+          <h1 className="font-serif-brand text-xl font-normal mb-4 text-brand-primary">{lesson.title}</h1>
 
           {/* ── Video lesson ─────────────────────────────────────────────── */}
           {lesson.type === "video" && lesson.videoUrl ? (
             (() => {
               const embed = toEmbedUrl(lesson.videoUrl);
               if (!embed) return (
-                <div className="w-full aspect-video rounded-xl flex items-center justify-center" style={{ backgroundColor: "#E7F1DE", color: "#5E6E69" }}>
+                <div className="w-full aspect-video rounded-xl flex items-center justify-center bg-brand-mint text-brand-muted">
                   Invalid video URL.
                 </div>
               );
@@ -395,7 +393,7 @@ export default function LessonPage() {
                       allowFullScreen
                     />
                   </div>
-                  <p className="text-xs" style={{ color: "#5E6E69" }}>
+                  <p className="text-xs text-brand-muted">
                     Video hosted externally — watch progress is not tracked automatically.
                   </p>
                   {lesson.transcript && (
@@ -436,7 +434,7 @@ export default function LessonPage() {
               </>
             )
           ) : lesson.type === "video" && !lesson.videoPath && !lesson.videoUrl ? (
-            <div className="w-full aspect-video rounded-xl flex items-center justify-center" style={{ backgroundColor: "#E7F1DE", color: "#5E6E69" }}>
+            <div className="w-full aspect-video rounded-xl flex items-center justify-center bg-brand-mint text-brand-muted">
               Video not yet uploaded.
             </div>
 
@@ -460,7 +458,7 @@ export default function LessonPage() {
               {quizAssessment ? (
                 <>
                   {quizCompleted && (
-                    <div className="inline-flex items-center gap-1.5 text-sm font-medium mb-2" style={{ color: "#8FB85C" }}>
+                    <div className="inline-flex items-center gap-1.5 text-sm font-medium mb-2 text-brand-accent">
                       <span>✓</span> Quiz completed
                     </div>
                   )}
@@ -471,7 +469,7 @@ export default function LessonPage() {
                   />
                 </>
               ) : (
-                <div className="card text-center py-12" style={{ color: "#5E6E69" }}>
+                <div className="card text-center py-12 text-brand-muted">
                   <p className="text-sm">This quiz has not been set up yet. Please check back later.</p>
                 </div>
               )}
@@ -498,7 +496,7 @@ export default function LessonPage() {
 
           ) : (
             /* ── Unknown / unimplemented type ─────────────────────────────── */
-            <div className="card text-center py-12" style={{ color: "#5E6E69" }}>
+            <div className="card text-center py-12 text-brand-muted">
               <p className="text-sm">
                 {`Content type "${lesson.type}" is not yet supported.`}
               </p>
@@ -532,12 +530,11 @@ function TranscriptPanel({ transcript, open, onToggle }: TranscriptPanelProps) {
       </button>
       {open && (
         <div id="lesson-transcript" className="card mt-2">
-          <h2 className="text-sm font-semibold mb-2" style={{ color: "#13403A" }}>
+          <h2 className="text-sm font-semibold mb-2 text-brand-primary">
             Transcript
           </h2>
           <div
-            className="text-sm whitespace-pre-wrap leading-relaxed"
-            style={{ color: "#1E302C" }}
+            className="text-sm whitespace-pre-wrap leading-relaxed text-brand-ink"
           >
             {transcript}
           </div>
@@ -559,7 +556,7 @@ interface NonVideoCompleteButtonProps {
 function NonVideoCompleteButton({ completed, loading, error, onMark }: NonVideoCompleteButtonProps) {
   if (completed) {
     return (
-      <div className="inline-flex items-center gap-1.5 text-sm font-medium" style={{ color: "#8FB85C" }}>
+      <div className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-accent">
         <span>✓</span> Completed
       </div>
     );

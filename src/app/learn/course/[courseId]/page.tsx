@@ -191,8 +191,7 @@ export default function CoursePage() {
     <LearnerShell>
       <div className="max-w-2xl mx-auto px-4 py-10">
         <div
-          className="rounded-lg p-4 text-sm"
-          style={{ backgroundColor: "#FEE2E2", color: "#991B1B" }}
+          className="rounded-lg p-4 text-sm bg-red-100 text-red-800"
         >
           {loadError}
         </div>
@@ -207,10 +206,10 @@ export default function CoursePage() {
           className="card inline-flex flex-col items-center gap-3 px-8 py-10"
         >
           <span style={{ fontSize: "2.5rem", lineHeight: 1 }}>🔒</span>
-          <h2 className="font-semibold text-base" style={{ color: "#13403A" }}>
+          <h2 className="font-semibold text-base text-brand-primary">
             {course?.title ?? "This course"} isn&apos;t assigned to your cohort yet.
           </h2>
-          <p className="text-sm" style={{ color: "#5E6E69" }}>
+          <p className="text-sm text-brand-muted">
             Ask your admin to add you to the right cohort.
           </p>
           <Link href="/learn" className="btn-secondary text-sm mt-2">
@@ -266,16 +265,16 @@ export default function CoursePage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
         {/* Course header hero */}
         <div className="page-hero mb-6">
-          <Link href="/learn" className="text-xs font-medium hover:underline mb-3 inline-block" style={{ color: "#8FB85C" }}>
+          <Link href="/learn" className="text-xs font-medium hover:underline mb-3 inline-block text-brand-accent">
             ← My Courses
           </Link>
           <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight">{course.title}</h1>
           {course.description && (
-            <p className="text-sm mt-1" style={{ color: "#CFE0D5" }}>{course.description}</p>
+            <p className="text-sm mt-1 text-brand-mist">{course.description}</p>
           )}
           {enrollment && (
             <div className="mt-3 max-w-xs">
-              <div className="flex justify-between text-xs mb-1" style={{ color: "#CFE0D5" }}>
+              <div className="flex justify-between text-xs mb-1 text-brand-mist">
                 <span>Your progress</span>
                 <span>{enrollment.progressPct}%</span>
               </div>
@@ -289,11 +288,11 @@ export default function CoursePage() {
           <div className="card mb-4" style={{ borderLeft: "4px solid #8FB85C" }}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <span className="kicker text-xs" style={{ color: "#2C7A6B" }}>PRE-COURSE ASSESSMENT</span>
-                <h3 className="font-semibold text-sm mt-0.5" style={{ color: "#13403A" }}>
+                <span className="kicker text-xs text-brand-teal">PRE-COURSE ASSESSMENT</span>
+                <h3 className="font-semibold text-sm mt-0.5 text-brand-primary">
                   {preAssessment.title}
                 </h3>
-                <p className="text-xs mt-1" style={{ color: "#5E6E69" }}>
+                <p className="text-xs mt-1 text-brand-muted">
                   {preAssessment.questions.length} question{preAssessment.questions.length !== 1 ? "s" : ""} · pass mark: {preAssessment.passMark}%
                 </p>
               </div>
@@ -305,7 +304,7 @@ export default function CoursePage() {
               </button>
             </div>
             {showingAssessment === "pre" && (
-              <div className="mt-4 pt-4 border-t" style={{ borderColor: "#DDE6DF" }}>
+              <div className="mt-4 pt-4 border-t border-brand-line">
                 <QuizForm
                   assessment={preAssessment}
                   onPassed={() => {
@@ -322,11 +321,11 @@ export default function CoursePage() {
         {/* Pre-assessment score when already attempted */}
         {preAssessment && preAttempt && (
           <div className="card mb-4" style={{ borderLeft: "4px solid #8FB85C" }}>
-            <span className="kicker text-xs" style={{ color: "#2C7A6B" }}>PRE-COURSE ASSESSMENT</span>
+            <span className="kicker text-xs text-brand-teal">PRE-COURSE ASSESSMENT</span>
             <div className="flex items-center justify-between mt-1">
               <div>
-                <p className="text-sm font-medium" style={{ color: "#13403A" }}>{preAssessment.title}</p>
-                <p className="text-xs mt-0.5" style={{ color: "#5E6E69" }}>
+                <p className="text-sm font-medium text-brand-primary">{preAssessment.title}</p>
+                <p className="text-xs mt-0.5 text-brand-muted">
                   Score: {preAttempt.score}/{preAttempt.total} ({preAttempt.total > 0 ? Math.round((preAttempt.score / preAttempt.total) * 100) : 0}%)
                   {" · "}
                   <span style={{ color: preAttempt.passed ? "#2C7A6B" : "#B91C1C" }}>
@@ -342,7 +341,7 @@ export default function CoursePage() {
               </button>
             </div>
             {showingAssessment === "pre" && (
-              <div className="mt-4 pt-4 border-t" style={{ borderColor: "#DDE6DF" }}>
+              <div className="mt-4 pt-4 border-t border-brand-line">
                 <QuizForm
                   assessment={preAssessment}
                   onPassed={() => setShowingAssessment(null)}
@@ -366,8 +365,8 @@ export default function CoursePage() {
             never taken, point the learner there before unlocking the post. */}
         {postAssessment && courseComplete && !postAttempt && preAssessment && !preAttempt && (
           <div className="card mb-4" style={{ borderLeft: "4px solid #B45309", backgroundColor: "#FFFBEB" }}>
-            <span className="kicker text-xs" style={{ color: "#B45309" }}>POST-COURSE ASSESSMENT — LOCKED</span>
-            <p className="text-sm mt-1" style={{ color: "#1E302C" }}>
+            <span className="kicker text-xs text-amber-700">POST-COURSE ASSESSMENT — LOCKED</span>
+            <p className="text-sm mt-1 text-brand-ink">
               Take the <b>pre-course assessment</b> above first — it&apos;s required before the
               final assessment so we can measure your improvement.
             </p>
@@ -379,11 +378,11 @@ export default function CoursePage() {
           <div className="card mb-4" style={{ borderLeft: "4px solid #13403A" }}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <span className="kicker text-xs" style={{ color: "#13403A" }}>POST-COURSE ASSESSMENT</span>
-                <h3 className="font-semibold text-sm mt-0.5" style={{ color: "#13403A" }}>
+                <span className="kicker text-xs text-brand-primary">POST-COURSE ASSESSMENT</span>
+                <h3 className="font-semibold text-sm mt-0.5 text-brand-primary">
                   {postAssessment.title}
                 </h3>
-                <p className="text-xs mt-1" style={{ color: "#5E6E69" }}>
+                <p className="text-xs mt-1 text-brand-muted">
                   You have completed the course — take the final assessment.
                 </p>
               </div>
@@ -395,7 +394,7 @@ export default function CoursePage() {
               </button>
             </div>
             {showingAssessment === "post" && (
-              <div className="mt-4 pt-4 border-t" style={{ borderColor: "#DDE6DF" }}>
+              <div className="mt-4 pt-4 border-t border-brand-line">
                 <QuizForm
                   assessment={postAssessment}
                   onPassed={() => {
@@ -411,11 +410,11 @@ export default function CoursePage() {
         {/* Post-assessment score when already attempted */}
         {postAssessment && postAttempt && (
           <div className="card mb-4" style={{ borderLeft: "4px solid #13403A" }}>
-            <span className="kicker text-xs" style={{ color: "#13403A" }}>POST-COURSE ASSESSMENT</span>
+            <span className="kicker text-xs text-brand-primary">POST-COURSE ASSESSMENT</span>
             <div className="flex items-center justify-between mt-1">
               <div>
-                <p className="text-sm font-medium" style={{ color: "#13403A" }}>{postAssessment.title}</p>
-                <p className="text-xs mt-0.5" style={{ color: "#5E6E69" }}>
+                <p className="text-sm font-medium text-brand-primary">{postAssessment.title}</p>
+                <p className="text-xs mt-0.5 text-brand-muted">
                   Score: {postAttempt.score}/{postAttempt.total} ({postAttempt.total > 0 ? Math.round((postAttempt.score / postAttempt.total) * 100) : 0}%)
                   {" · "}
                   <span style={{ color: postAttempt.passed ? "#2C7A6B" : "#B91C1C" }}>
@@ -431,7 +430,7 @@ export default function CoursePage() {
               </button>
             </div>
             {showingAssessment === "post" && (
-              <div className="mt-4 pt-4 border-t" style={{ borderColor: "#DDE6DF" }}>
+              <div className="mt-4 pt-4 border-t border-brand-line">
                 <QuizForm
                   assessment={postAssessment}
                   onPassed={() => setShowingAssessment(null)}
@@ -448,13 +447,13 @@ export default function CoursePage() {
             style={{ borderLeft: "4px solid #8FB85C", backgroundColor: "#FBFDF9" }}
           >
             <div className="flex-1">
-              <span className="kicker text-xs" style={{ color: "#2C7A6B" }}>CERTIFICATE</span>
-              <h3 className="font-semibold text-sm mt-0.5" style={{ color: "#13403A" }}>
+              <span className="kicker text-xs text-brand-teal">CERTIFICATE</span>
+              <h3 className="font-semibold text-sm mt-0.5 text-brand-primary">
                 {certificate
                   ? "Your certificate has been issued 🎓"
                   : "You've earned your certificate 🎓"}
               </h3>
-              <p className="text-xs mt-1" style={{ color: "#5E6E69" }}>
+              <p className="text-xs mt-1 text-brand-muted">
                 {certificate ? (
                   <>
                     ID: <span className="font-mono font-semibold">{certificate.certId}</span>
@@ -473,7 +472,7 @@ export default function CoursePage() {
                   "Download your branded PDF — it will also be emailed to you."
                 )}
               </p>
-              {certError && <p className="text-xs mt-1" style={{ color: "#B91C1C" }}>{certError}</p>}
+              {certError && <p className="text-xs mt-1 text-red-700">{certError}</p>}
             </div>
             <button
               onClick={handleGetCertificate}
@@ -490,8 +489,8 @@ export default function CoursePage() {
         <div className="space-y-4">
           {modules.map((mod) => (
             <div key={mod.id} className="card overflow-hidden !p-0">
-              <div className="px-4 sm:px-5 py-3 border-b" style={{ borderColor: "#DDE6DF", backgroundColor: "#F5F7F4" }}>
-                <h2 className="font-semibold text-sm" style={{ color: "#13403A" }}>{mod.title}</h2>
+              <div className="px-4 sm:px-5 py-3 border-b border-brand-line bg-brand-cream">
+                <h2 className="font-semibold text-sm text-brand-primary">{mod.title}</h2>
               </div>
               <ul className="space-y-0.5 p-3">
                 {(lessonMap[mod.id] ?? []).map((lesson) => {
@@ -522,7 +521,7 @@ export default function CoursePage() {
                           {done ? "✓" : ""}
                         </span>
                         <span className="flex-1 truncate">{lesson.title}</span>
-                        <span className="text-xs uppercase" style={{ color: "#5E6E69" }}>{lesson.type}</span>
+                        <span className="text-xs uppercase text-brand-muted">{lesson.type}</span>
                       </Link>
                     </li>
                   );

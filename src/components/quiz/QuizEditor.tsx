@@ -296,7 +296,7 @@ export default function QuizEditor({
           required
         />
         <div className="flex items-center gap-2">
-          <label className="text-xs font-medium" style={{ color: "#5E6E69" }}>
+          <label className="text-xs font-medium text-brand-muted">
             Pass mark (%):
           </label>
           <input
@@ -330,8 +330,7 @@ export default function QuizEditor({
         <button
           type="button"
           onClick={() => setShowFormatGuide((v) => !v)}
-          className="text-xs underline"
-          style={{ color: "#2C7A6B" }}
+          className="text-xs underline text-brand-teal"
         >
           {showFormatGuide ? "Hide format guide" : "Format guide"}
         </button>
@@ -339,14 +338,12 @@ export default function QuizEditor({
 
       {showFormatGuide && (
         <div
-          className="rounded-lg p-3 text-xs space-y-1.5 border"
-          style={{ backgroundColor: "#E7F1DE", borderColor: "#8FB85C", color: "#1E302C" }}
+          className="rounded-lg p-3 text-xs space-y-1.5 border bg-brand-mint border-brand-accent text-brand-ink"
         >
-          <p className="font-semibold" style={{ color: "#13403A" }}>Expected DOCX layout</p>
+          <p className="font-semibold text-brand-primary">Expected DOCX layout</p>
           <p>Separate each question block with a blank line. Supported formats:</p>
           <pre
-            className="rounded p-2 mt-1 text-xs overflow-x-auto"
-            style={{ backgroundColor: "#F5F7F4", color: "#1E302C" }}
+            className="rounded p-2 mt-1 text-xs overflow-x-auto bg-brand-cream text-brand-ink"
           >{`Q1. What is the capital of France?
 A) Paris / B) London / C) Berlin / D) Madrid
 Answer: A
@@ -361,7 +358,7 @@ B) React
 C) Laravel
 D) Flask
 Ans: B`}</pre>
-          <ul className="list-disc list-inside space-y-0.5 mt-1" style={{ color: "#5E6E69" }}>
+          <ul className="list-disc list-inside space-y-0.5 mt-1 text-brand-muted">
             <li>Question line must start with <code>Q1.</code>, <code>Q2.</code>, etc.</li>
             <li>Options: 2–6 choices prefixed A), B), … (slash-separated or one per line)</li>
             <li>Answer line: <code>Answer: B</code> or <code>Ans: B</code> (case-insensitive)</li>
@@ -374,8 +371,7 @@ Ans: B`}</pre>
       {/* Import warnings */}
       {importWarnings.length > 0 && (
         <div
-          className="rounded-lg p-3 text-xs space-y-1 border"
-          style={{ backgroundColor: "#FEF3C7", borderColor: "#F59E0B", color: "#92400E" }}
+          className="rounded-lg p-3 text-xs space-y-1 border bg-amber-100 border-amber-500 text-amber-800"
         >
           <p className="font-semibold">Import warnings ({importWarnings.length})</p>
           <ul className="list-disc list-inside space-y-0.5">
@@ -394,7 +390,7 @@ Ans: B`}</pre>
           style={{ borderLeft: "3px solid #8FB85C" }}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase" style={{ color: "#2C7A6B" }}>
+            <span className="text-xs font-semibold uppercase text-brand-teal">
               Question {qIdx + 1}
             </span>
             {questions.length > 1 && (
@@ -418,7 +414,7 @@ Ans: B`}</pre>
           />
 
           <div className="flex items-center gap-2">
-            <label className="text-xs" style={{ color: "#5E6E69" }}>Type:</label>
+            <label className="text-xs text-brand-muted">Type:</label>
             <select
               className="input-field text-xs py-1"
               value={q.type}
@@ -431,7 +427,7 @@ Ans: B`}</pre>
 
           {/* Options */}
           <div className="space-y-1.5">
-            <p className="text-xs font-medium" style={{ color: "#5E6E69" }}>
+            <p className="text-xs font-medium text-brand-muted">
               Options — select the correct answer:
             </p>
             {q.options.map((opt, optIdx) => (
@@ -445,7 +441,7 @@ Ans: B`}</pre>
                   title="Mark as correct answer"
                 />
                 {q.type === "tf" ? (
-                  <span className="text-sm" style={{ color: "#1E302C" }}>{opt}</span>
+                  <span className="text-sm text-brand-ink">{opt}</span>
                 ) : (
                   <>
                     <input
@@ -477,8 +473,7 @@ Ans: B`}</pre>
               <button
                 type="button"
                 onClick={() => addOption(qIdx)}
-                className="text-xs"
-                style={{ color: "#2C7A6B" }}
+                className="text-xs text-brand-teal"
               >
                 + Add option
               </button>
@@ -496,7 +491,7 @@ Ans: B`}</pre>
       </button>
 
       {keyFetchWarning && (
-        <p className="text-xs rounded-md px-3 py-2" style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}>
+        <p className="text-xs rounded-md px-3 py-2 bg-amber-100 text-amber-800">
           Re-select correct answers before saving — previous answer key could not be loaded.
         </p>
       )}

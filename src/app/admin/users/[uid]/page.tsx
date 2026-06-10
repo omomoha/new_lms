@@ -277,7 +277,7 @@ export default function LearnerAnalyticsPage() {
             <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight truncate">
               {user.name || user.email}
             </h1>
-            <p className="mt-1 text-sm flex items-center gap-2 flex-wrap" style={{ color: "#CFE0D5" }}>
+            <p className="mt-1 text-sm flex items-center gap-2 flex-wrap text-brand-mist">
               <span>{user.email}</span>
               <Badge
                 label={user.role}
@@ -309,7 +309,7 @@ export default function LearnerAnalyticsPage() {
                   <span className="font-serif-brand text-2xl font-semibold text-white leading-none">
                     {k.value}
                   </span>
-                  <span className="text-xs mt-0.5" style={{ color: "#CFE0D5" }}>
+                  <span className="text-xs mt-0.5 text-brand-mist">
                     {k.label}
                   </span>
                 </div>
@@ -334,11 +334,11 @@ export default function LearnerAnalyticsPage() {
 
       {/* ── Course progress card ─────────────────────────────────────────────── */}
       <div className="card mb-4">
-        <h2 className="font-medium mb-4" style={{ color: "#1E302C" }}>
+        <h2 className="font-medium mb-4 text-brand-ink">
           Course progress
         </h2>
         {courseRows.length === 0 ? (
-          <p className="text-sm py-2" style={{ color: "#5E6E69" }}>
+          <p className="text-sm py-2 text-brand-muted">
             No courses assigned to this learner&apos;s cohorts yet.
           </p>
         ) : (
@@ -353,8 +353,7 @@ export default function LearnerAnalyticsPage() {
               return (
                 <div key={row.courseId} className="flex items-center gap-3">
                   <span
-                    className="text-xs font-medium w-36 flex-shrink-0 truncate"
-                    style={{ color: "#1E302C" }}
+                    className="text-xs font-medium w-36 flex-shrink-0 truncate text-brand-ink"
                     title={row.title}
                   >
                     {row.title}
@@ -373,8 +372,7 @@ export default function LearnerAnalyticsPage() {
                     />
                   </div>
                   <span
-                    className="text-xs font-semibold w-10 flex-shrink-0 text-right tabular-nums"
-                    style={{ color: "#13403A" }}
+                    className="text-xs font-semibold w-10 flex-shrink-0 text-right tabular-nums text-brand-primary"
                   >
                     {row.progressPct}%
                   </span>
@@ -391,9 +389,9 @@ export default function LearnerAnalyticsPage() {
       {/* ── Pre→post lift card ───────────────────────────────────────────────── */}
       {lifts.length > 0 && (
         <div className="card mb-4">
-          <h2 className="font-medium mb-4" style={{ color: "#1E302C" }}>
+          <h2 className="font-medium mb-4 text-brand-ink">
             Assessment lift{" "}
-            <span className="text-xs font-normal ml-1" style={{ color: "#5E6E69" }}>
+            <span className="text-xs font-normal ml-1 text-brand-muted">
               pre → post per course
             </span>
           </h2>
@@ -409,17 +407,16 @@ export default function LearnerAnalyticsPage() {
                   style={{ backgroundColor: "#F2F8EC", border: "1px solid #D4E8C0" }}
                 >
                   <span
-                    className="text-xs font-medium flex-1 min-w-0 truncate"
-                    style={{ color: "#1E302C" }}
+                    className="text-xs font-medium flex-1 min-w-0 truncate text-brand-ink"
                     title={lr.courseTitle}
                   >
                     {lr.courseTitle}
                   </span>
-                  <span className="text-xs tabular-nums" style={{ color: "#5E6E69" }}>
+                  <span className="text-xs tabular-nums text-brand-muted">
                     Pre: {prePct}%
                   </span>
-                  <span className="text-xs" style={{ color: "#5E6E69" }}>→</span>
-                  <span className="text-xs tabular-nums" style={{ color: "#5E6E69" }}>
+                  <span className="text-xs text-brand-muted">→</span>
+                  <span className="text-xs tabular-nums text-brand-muted">
                     Post: {postPct}%
                   </span>
                   <span
@@ -440,17 +437,16 @@ export default function LearnerAnalyticsPage() {
 
       {/* ── Attempts card ────────────────────────────────────────────────────── */}
       <div className="card mb-4">
-        <h2 className="font-medium mb-4" style={{ color: "#1E302C" }}>
+        <h2 className="font-medium mb-4 text-brand-ink">
           Assessment attempts
           <span
-            className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold"
-            style={{ backgroundColor: "#E7F1DE", color: "#13403A" }}
+            className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-brand-mint text-brand-primary"
           >
             {attemptRows.length}
           </span>
         </h2>
         {attemptRows.length === 0 ? (
-          <p className="text-sm py-2" style={{ color: "#5E6E69" }}>
+          <p className="text-sm py-2 text-brand-muted">
             No assessment attempts recorded yet.
           </p>
         ) : (
@@ -458,11 +454,11 @@ export default function LearnerAnalyticsPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr style={{ borderBottom: "1px solid #DDE6DF" }}>
-                  <th className="text-left pb-2 font-semibold pr-3" style={{ color: "#5E6E69" }}>Course</th>
-                  <th className="text-left pb-2 font-semibold pr-3" style={{ color: "#5E6E69" }}>Kind</th>
-                  <th className="text-right pb-2 font-semibold pr-3" style={{ color: "#5E6E69" }}>Score</th>
-                  <th className="text-center pb-2 font-semibold pr-3" style={{ color: "#5E6E69" }}>Pass</th>
-                  <th className="text-right pb-2 font-semibold" style={{ color: "#5E6E69" }}>Date</th>
+                  <th className="text-left pb-2 font-semibold pr-3 text-brand-muted">Course</th>
+                  <th className="text-left pb-2 font-semibold pr-3 text-brand-muted">Kind</th>
+                  <th className="text-right pb-2 font-semibold pr-3 text-brand-muted">Score</th>
+                  <th className="text-center pb-2 font-semibold pr-3 text-brand-muted">Pass</th>
+                  <th className="text-right pb-2 font-semibold text-brand-muted">Date</th>
                 </tr>
               </thead>
               <tbody>
@@ -476,26 +472,26 @@ export default function LearnerAnalyticsPage() {
                       : "warning";
                   return (
                     <tr key={a.id} style={{ borderBottom: "1px solid #F0F4F1" }}>
-                      <td className="py-2 pr-3 truncate max-w-[160px]" style={{ color: "#1E302C" }}>
+                      <td className="py-2 pr-3 truncate max-w-[160px] text-brand-ink">
                         {a.courseTitle}
                       </td>
                       <td className="py-2 pr-3">
                         <Badge label={a.kind} variant={kindVariant} />
                       </td>
-                      <td className="py-2 pr-3 text-right tabular-nums font-semibold" style={{ color: "#13403A" }}>
+                      <td className="py-2 pr-3 text-right tabular-nums font-semibold text-brand-primary">
                         {a.score}/{a.total}{" "}
-                        <span className="font-normal" style={{ color: "#5E6E69" }}>
+                        <span className="font-normal text-brand-muted">
                           ({scorePct}%)
                         </span>
                       </td>
                       <td className="py-2 pr-3 text-center">
                         {a.passed ? (
-                          <span style={{ color: "#8FB85C" }} aria-label="passed">&#10003;</span>
+                          <span className="text-brand-accent" aria-label="passed">&#10003;</span>
                         ) : (
                           <span style={{ color: "#C9772F" }} aria-label="failed">&#10007;</span>
                         )}
                       </td>
-                      <td className="py-2 text-right tabular-nums" style={{ color: "#5E6E69" }}>
+                      <td className="py-2 text-right tabular-nums text-brand-muted">
                         {formatDate(a.submittedAt)}
                       </td>
                     </tr>

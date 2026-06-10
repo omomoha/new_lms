@@ -49,17 +49,17 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4" style={{ backgroundColor: "#13403A" }}>
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-brand-primary">
       <div className="mb-8 text-center">
         <div className="inline-flex items-center gap-2 mb-2">
-          <span className="font-serif-brand font-bold text-3xl tracking-tight" style={{ color: "#8FB85C" }}>Andela</span>
+          <span className="font-serif-brand font-bold text-3xl tracking-tight text-brand-accent">Andela</span>
           <span className="text-white font-light text-3xl">LMS</span>
         </div>
         <p className="text-sm" style={{ color: "rgba(255,255,255,0.5)" }}>Create your account</p>
       </div>
 
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6 sm:p-8">
-        <h1 className="font-serif-brand text-xl font-normal mb-6" style={{ color: "#13403A" }}>Sign up</h1>
+        <h1 className="font-serif-brand text-xl font-normal mb-6 text-brand-primary">Sign up</h1>
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -69,17 +69,17 @@ export default function RegisterPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="name" className="block text-sm font-medium mb-1" style={{ color: "#1E302C" }}>Full name</label>
+            <label htmlFor="name" className="block text-sm font-medium mb-1 text-brand-ink">Full name</label>
             <input id="name" type="text" autoComplete="name" required value={name}
               onChange={(e) => setName(e.target.value)} className="input-field" placeholder="Ada Lovelace" />
           </div>
           <div>
-            <label htmlFor="email" className="block text-sm font-medium mb-1" style={{ color: "#1E302C" }}>Email address</label>
+            <label htmlFor="email" className="block text-sm font-medium mb-1 text-brand-ink">Email address</label>
             <input id="email" type="email" autoComplete="email" required value={email}
               onChange={(e) => setEmail(e.target.value)} className="input-field" placeholder="you@example.com" />
           </div>
           <div>
-            <label htmlFor="password" className="block text-sm font-medium mb-1" style={{ color: "#1E302C" }}>Password</label>
+            <label htmlFor="password" className="block text-sm font-medium mb-1 text-brand-ink">Password</label>
             <input id="password" type="password" autoComplete="new-password" required value={password}
               onChange={(e) => setPassword(e.target.value)} className="input-field" placeholder="At least 6 characters" />
           </div>
@@ -88,9 +88,9 @@ export default function RegisterPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm" style={{ color: "#5E6E69" }}>
+        <p className="mt-6 text-center text-sm text-brand-muted">
           Already have an account?{" "}
-          <Link href="/auth/login" className="font-semibold hover:underline" style={{ color: "#8FB85C" }}>Sign in</Link>
+          <Link href="/auth/login" className="font-semibold hover:underline text-brand-accent">Sign in</Link>
         </p>
       </div>
     </div>

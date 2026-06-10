@@ -103,7 +103,7 @@ export default function QuizForm({ assessment, onPassed, existingAttempt }: Quiz
       : 0;
     return (
       <div className="card space-y-3">
-        <p className="text-sm font-medium" style={{ color: "#13403A" }}>
+        <p className="text-sm font-medium text-brand-primary">
           Previous result: {existingAttempt.score}/{existingAttempt.total} ({pct}%)
         </p>
         <span
@@ -129,10 +129,10 @@ export default function QuizForm({ assessment, onPassed, existingAttempt }: Quiz
     return (
       <div className="space-y-4">
         <div className="card">
-          <h3 className="font-semibold mb-1" style={{ color: "#13403A" }}>
+          <h3 className="font-semibold mb-1 text-brand-primary">
             {assessment.title} — Results
           </h3>
-          <p className="text-sm" style={{ color: "#1E302C" }}>
+          <p className="text-sm text-brand-ink">
             Score: {result.score}/{result.total} ({pct}%)
           </p>
           <span
@@ -161,10 +161,10 @@ export default function QuizForm({ assessment, onPassed, existingAttempt }: Quiz
                   borderLeft: `3px solid ${correct ? "#8FB85C" : "#EF4444"}`,
                 }}
               >
-                <p className="text-sm font-medium mb-1" style={{ color: "#1E302C" }}>
+                <p className="text-sm font-medium mb-1 text-brand-ink">
                   {idx + 1}. {q.prompt}
                 </p>
-                <p className="text-xs" style={{ color: "#5E6E69" }}>
+                <p className="text-xs text-brand-muted">
                   Your answer:{" "}
                   <strong>
                     {selected[q.id] !== undefined
@@ -173,9 +173,9 @@ export default function QuizForm({ assessment, onPassed, existingAttempt }: Quiz
                   </strong>
                   {" · "}
                   {correct ? (
-                    <span style={{ color: "#2C7A6B" }}>Correct</span>
+                    <span className="text-brand-teal">Correct</span>
                   ) : (
-                    <span style={{ color: "#B91C1C" }}>Incorrect</span>
+                    <span className="text-red-700">Incorrect</span>
                   )}
                 </p>
               </div>
@@ -195,16 +195,16 @@ export default function QuizForm({ assessment, onPassed, existingAttempt }: Quiz
   // Show quiz form
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <h3 className="font-semibold text-base" style={{ color: "#13403A" }}>
+      <h3 className="font-semibold text-base text-brand-primary">
         {assessment.title}
       </h3>
-      <p className="text-xs" style={{ color: "#5E6E69" }}>
+      <p className="text-xs text-brand-muted">
         Pass mark: {assessment.passMark}% — answer all questions, then submit.
       </p>
 
       {assessment.questions.map((q, idx) => (
         <div key={q.id} className="card !py-3 space-y-2">
-          <p className="text-sm font-medium" style={{ color: "#1E302C" }}>
+          <p className="text-sm font-medium text-brand-ink">
             {idx + 1}. {q.prompt}
           </p>
           <div className="space-y-1.5">
@@ -226,7 +226,7 @@ export default function QuizForm({ assessment, onPassed, existingAttempt }: Quiz
                   onChange={() => setSelected((prev) => ({ ...prev, [q.id]: optIdx }))}
                   className="accent-[#8FB85C]"
                 />
-                <span className="text-sm" style={{ color: "#1E302C" }}>{opt}</span>
+                <span className="text-sm text-brand-ink">{opt}</span>
               </label>
             ))}
           </div>

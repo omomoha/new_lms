@@ -70,7 +70,7 @@ export default function OnboardingPage() {
           <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight">
             Bulk Onboard Users
           </h1>
-          <p className="mt-1 text-sm" style={{ color: "#CFE0D5" }}>
+          <p className="mt-1 text-sm text-brand-mist">
             Upload a CSV with <code className="font-mono">name, email, role, cohort_tag</code> to create accounts and assign cohorts.
           </p>
         </div>
@@ -78,7 +78,7 @@ export default function OnboardingPage() {
         <div className="card mb-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1" style={{ color: "#1E302C" }}>
+              <label className="block text-sm font-medium mb-1 text-brand-ink">
                 CSV / XLSX File
               </label>
               <input
@@ -104,15 +104,14 @@ export default function OnboardingPage() {
 
             {/* Template download */}
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <p className="text-xs" style={{ color: "#5E6E69" }}>
+              <p className="text-xs text-brand-muted">
                 Required columns: <strong>name</strong>, <strong>email</strong>,{" "}
                 <strong>role</strong> (admin|learner), <strong>cohort_tag</strong>.
                 Header capitalization and spaces are tolerated.
               </p>
               <button
                 type="button"
-                className="text-xs font-semibold hover:underline"
-                style={{ color: "#8FB85C" }}
+                className="text-xs font-semibold hover:underline text-brand-accent"
                 onClick={() => {
                   const blob = new Blob([TEMPLATE_CSV], { type: "text/csv" });
                   const url = URL.createObjectURL(blob);
