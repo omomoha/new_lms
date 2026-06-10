@@ -80,11 +80,12 @@ async function pdfToText(buf: ArrayBuffer): Promise<string> {
     for (let i = 1; i <= doc.numPages; i++) {
       const page = await doc.getPage(i);
       const content = await page.getTextContent();
-      parts.push(
-        assemblePageText(
-          content.items.filter((it): it is PdfTextItem => "str" in it)
-        )
-      );
+      // pdf.js items are TextItem | TextMarkedContent; the "str" filter keeps
+      // TextItems, which carry the str/transform/width/height we consume.
+      const textItems = content.items.filter(
+        (it) => "str" in it
+      ) as unknown as PdfTextItem[];
+      parts.push(assemblePageText(textItems));
     }
     return parts.join("\n\n");
   } finally {
