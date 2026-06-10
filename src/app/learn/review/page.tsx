@@ -97,6 +97,7 @@ export default function ReviewPage() {
           .filter(
             (c) =>
               appUser.role === "admin" ||
+              c.availability === "all" ||
               (c.assignedCohortIds ?? []).some((id) => myCohorts.includes(id))
           );
         setCourses(accessible);

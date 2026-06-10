@@ -44,6 +44,9 @@ export interface Course {
   status: CourseStatus;
   moduleOrder: string[];        // ordered list of module IDs
   assignedCohortIds: string[];
+  /** Who can access a published course: assigned cohorts only (default) or
+   *  every signed-in user. Admin-controlled from the course page. */
+  availability?: "cohorts" | "all";
   createdAt: Timestamp;
   thumbPath?: string;           // Firebase Storage path for course thumbnail
   certTemplatePath?: string;    // Phase 3: Storage path to a custom certificate background (PNG/JPG)

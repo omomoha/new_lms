@@ -65,6 +65,18 @@ beforeAll(async () => {
       status: "published",
       assignedCohortIds: ["cohort-other"],
     });
+    await setDoc(doc(db, "courses", "course-open"), {
+      title: "Open Course",
+      status: "published",
+      availability: "all",
+      assignedCohortIds: [],
+    });
+    await setDoc(doc(db, "courses", "course-open-draft"), {
+      title: "Open Draft",
+      status: "draft",
+      availability: "all",
+      assignedCohortIds: [],
+    });
     // Seeded progress doc (streak list-query test)
     await setDoc(doc(db, "progress", "learner-uid_lessonSeeded"), {
       userId: "learner-uid",
@@ -336,6 +348,53 @@ describe("learner module cohort restriction", () => {
     const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
     await assertSucceeds(
       getDoc(doc(learner.firestore(), "courses", "course-mine", "modules", "mod1"))
+    );
+  });
+});
+
+// ── (iv-b) availability: "all" opens published courses to any learner ───────
+describe("course availability: all users", () => {
+  it("allows an UNASSIGNED learner to read modules of an open course", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertSucceeds(
+      getDoc(doc(learner.firestore(), "courses", "course-open", "modules", "mod1"))
+    );
+  });
+
+  it("allows an unassigned learner to read lessons of an open course", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertSucceeds(
+      getDoc(
+        doc(learner.firestore(), "courses", "course-open", "modules", "mod1", "lessons", "l1")
+      )
+    );
+  });
+
+  it("allows an unassigned learner to write their enrollment on an open course", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertSucceeds(
+      setDoc(doc(learner.firestore(), "enrollments", "learner-uid_course-open"), {
+        userId: "learner-uid",
+        courseId: "course-open",
+        cohortId: "",
+        progressPct: 10,
+        lastLessonId: null,
+        updatedAt: new Date(),
+      })
+    );
+  });
+
+  it("still denies a DRAFT open course", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertFails(
+      getDoc(doc(learner.firestore(), "courses", "course-open-draft", "modules", "mod1"))
+    );
+  });
+
+  it("still denies cohort-restricted courses to outsiders", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertFails(
+      getDoc(doc(learner.firestore(), "courses", "course-other", "modules", "mod1"))
     );
   });
 });

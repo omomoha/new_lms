@@ -43,6 +43,20 @@ service cloud.firestore {
       return isAuthed() && request.auth.uid == uid;
     }
 
+    // Course availability gate: a published course is accessible when the
+    // admin opened it to ALL users (availability == "all") OR it is assigned
+    // to one of the caller's cohorts. get() results are cached per request,
+    // so the repeated course/user reads cost one document read each.
+    function canAccessCourse(courseId) {
+      return get(/databases/$(database)/documents/courses/$(courseId)).data.status == "published"
+        && (
+          get(/databases/$(database)/documents/courses/$(courseId)).data.get("availability", "cohorts") == "all"
+          || get(/databases/$(database)/documents/courses/$(courseId)).data.assignedCohortIds.hasAny(
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cohortIds
+             )
+        );
+    }
+
     // ── users/{uid} ─────────────────────────────────────────────────────────
     match /users/{uid} {
       // Users can read their own doc; admins can read any user doc
@@ -89,25 +103,13 @@ service cloud.firestore {
       // Fix #14: modules subcollection — enforce same cohort-assignment check
       // as the course-level rule (not just published status).
       match /modules/{moduleId} {
-        allow read: if isAdmin()
-          || (isLearner()
-              && get(/databases/$(database)/documents/courses/$(courseId)).data.status == "published"
-              && get(/databases/$(database)/documents/courses/$(courseId)).data.assignedCohortIds.hasAny(
-                   get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cohortIds
-                 )
-             );
+        allow read: if isAdmin() || (isLearner() && canAccessCourse(courseId));
         allow write: if isAdmin();
 
         // Fix #14: lessons subcollection — enforce same cohort-assignment check
         // as the course-level rule (not just published status).
         match /lessons/{lessonId} {
-          allow read: if isAdmin()
-            || (isLearner()
-                && get(/databases/$(database)/documents/courses/$(courseId)).data.status == "published"
-                && get(/databases/$(database)/documents/courses/$(courseId)).data.assignedCohortIds.hasAny(
-                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cohortIds
-                   )
-               );
+          allow read: if isAdmin() || (isLearner() && canAccessCourse(courseId));
           allow write: if isAdmin();
         }
       }
@@ -135,9 +137,7 @@ service cloud.firestore {
       allow write: if isAdmin()
         || (isAuthed()
             && enrollmentId.matches(request.auth.uid + "_.+")
-            && get(/databases/$(database)/documents/courses/$(enrollmentId.split(request.auth.uid + "_")[1])).data.assignedCohortIds.hasAny(
-                 get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cohortIds
-               )
+            && canAccessCourse(enrollmentId.split(request.auth.uid + "_")[1])
            );
     }
 
@@ -258,9 +258,7 @@ service cloud.firestore {
     match /discussions/{postId} {
       allow read: if isAdmin()
         || (isLearner()
-            && get(/databases/$(database)/documents/courses/$(resource.data.courseId)).data.assignedCohortIds.hasAny(
-                 get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cohortIds
-               ));
+            && canAccessCourse(resource.data.courseId));
       allow create: if isAuthed()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.body is string
@@ -271,9 +269,7 @@ service cloud.firestore {
         && (request.resource.data.parentId == null
             || request.resource.data.parentId is string)
         && (isAdmin()
-            || get(/databases/$(database)/documents/courses/$(request.resource.data.courseId)).data.assignedCohortIds.hasAny(
-                 get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cohortIds
-               ));
+            || canAccessCourse(request.resource.data.courseId));
       allow delete: if isAdmin()
         || (isAuthed() && resource.data.userId == request.auth.uid);
       allow update: if false; // no edits — delete and repost
@@ -293,9 +289,7 @@ service cloud.firestore {
     match /assessments/{assessmentId} {
       allow read: if isAdmin()
         || (isLearner()
-            && get(/databases/$(database)/documents/courses/$(resource.data.courseId)).data.assignedCohortIds.hasAny(
-                 get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cohortIds
-               ));
+            && canAccessCourse(resource.data.courseId));
       allow write: if isAdmin();
     }
 

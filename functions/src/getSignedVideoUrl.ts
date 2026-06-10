@@ -88,13 +88,15 @@ export const getSignedVideoUrl = onCall<GetSignedVideoUrlRequest>(
       }
       const course = courseSnap.data() as {
         status?: string;
+        availability?: string;
         assignedCohortIds?: string[];
       };
       const userCohorts: string[] = (userSnap.data()?.cohortIds as string[]) ?? [];
       const assigned = course.assignedCohortIds ?? [];
       const hasAccess =
         course.status === "published" &&
-        assigned.some((c) => userCohorts.includes(c));
+        (course.availability === "all" ||
+          assigned.some((c) => userCohorts.includes(c)));
       if (!hasAccess) {
         throw new HttpsError(
           "permission-denied",

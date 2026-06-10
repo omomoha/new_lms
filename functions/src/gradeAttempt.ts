@@ -125,12 +125,15 @@ export const gradeAttempt = onCall<GradeAttemptRequest>(
       }
       const courseData = courseSnap.data() as {
         status: string;
+        availability?: string;
         assignedCohortIds?: string[];
       };
 
       const callerCohorts = userData.cohortIds ?? [];
       const courseCohorts = courseData.assignedCohortIds ?? [];
-      const hasOverlap = callerCohorts.some((c) => courseCohorts.includes(c));
+      const hasOverlap =
+        courseData.availability === "all" ||
+        callerCohorts.some((c) => courseCohorts.includes(c));
 
       if (courseData.status !== "published" || !hasOverlap) {
         throw new HttpsError(

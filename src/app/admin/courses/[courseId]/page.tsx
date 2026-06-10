@@ -36,11 +36,14 @@ import { Badge } from "@/components/ui/Badge";
 import QuizEditor from "@/components/quiz/QuizEditor";
 import { toEmbedUrl } from "@/lib/videoEmbed";
 import { EntityThumb } from "@/components/ui/Thumb";
+import { logAdminAction } from "@/lib/audit";
+import { useAuth } from "@/contexts/AuthContext";
 
 const LESSON_TYPES: LessonType[] = ["video", "text", "slides", "doc", "lab", "quiz"];
 
 export default function CourseBuilderPage() {
   const params = useParams();
+  const { user } = useAuth();
   const router = useRouter();
   const courseId = params.courseId as string;
 
@@ -282,6 +285,31 @@ export default function CourseBuilderPage() {
       setError(err instanceof Error ? err.message : "Failed to add lesson");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const setAvailability = async (next: "cohorts" | "all") => {
+    if (!course || (course.availability ?? "cohorts") === next) return;
+    setError(null);
+    try {
+      await updateDoc(doc(db, "courses", courseId), { availability: next });
+      setCourse({ ...course, availability: next });
+      if (user) {
+        void logAdminAction(
+          { uid: user.uid, email: user.email },
+          {
+            action: "course.availability",
+            targetType: "course",
+            targetId: courseId,
+            details:
+              next === "all"
+                ? `Opened "${course.title}" to ALL users`
+                : `Restricted "${course.title}" to assigned cohorts`,
+          }
+        );
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update availability");
     }
   };
 
@@ -589,12 +617,45 @@ export default function CourseBuilderPage() {
         </div>
       )}
 
-      {/* Cohort access */}
+      {/* Availability + cohort access */}
       <div className="card mb-4">
+        <h2 className="font-medium mb-1 text-brand-ink">Availability</h2>
+        <p className="text-xs mb-2 text-brand-muted">
+          Who can access this course once it is <b>published</b>.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 mb-4" role="radiogroup" aria-label="Course availability">
+          <label className="flex items-start gap-2 text-sm cursor-pointer">
+            <input
+              type="radio"
+              name="availability"
+              className="mt-0.5"
+              checked={(course?.availability ?? "cohorts") === "cohorts"}
+              onChange={() => void setAvailability("cohorts")}
+            />
+            <span>
+              <span className="font-medium text-brand-ink">Assigned cohorts only</span>
+              <span className="block text-xs text-brand-muted">Default — learners need a cohort assignment below.</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm cursor-pointer">
+            <input
+              type="radio"
+              name="availability"
+              className="mt-0.5"
+              checked={course?.availability === "all"}
+              onChange={() => void setAvailability("all")}
+            />
+            <span>
+              <span className="font-medium text-brand-ink">All users</span>
+              <span className="block text-xs text-brand-muted">Every signed-in learner can take this course.</span>
+            </span>
+          </label>
+        </div>
         <h2 className="font-medium mb-1 text-brand-ink">Cohort access</h2>
         <p className="text-xs mb-3 text-brand-muted">
-          Learners see this course only when it is <b>published</b> and assigned to
-          one of their cohorts.
+          {course?.availability === "all"
+            ? "Open to all users — cohort assignments below still drive due dates and reporting."
+            : "Learners see this course only when it is published and assigned to one of their cohorts."}
         </p>
         {cohorts.length === 0 ? (
           <p className="text-xs text-brand-muted">

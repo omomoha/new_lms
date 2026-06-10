@@ -105,6 +105,7 @@ export default function LearnDashboard() {
 
         const withAccessAndProgress = allPublished.map((c) => {
           const hasAccess =
+            c.availability === "all" ||
             (c.assignedCohortIds ?? []).some((id) => userCohortIds.includes(id));
           const enrollment = hasAccess ? enrollByCourse.get(c.id) : undefined;
           const dueMillis = hasAccess

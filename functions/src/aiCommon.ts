@@ -158,12 +158,14 @@ export async function requireCourseAccess(
   if (!courseSnap.exists) throw new HttpsError("not-found", "Course not found.");
   const course = courseSnap.data() as {
     status?: string;
+    availability?: string;
     assignedCohortIds?: string[];
   };
   const userCohorts: string[] = (userSnap.data()?.cohortIds as string[]) ?? [];
   const ok =
     course.status === "published" &&
-    (course.assignedCohortIds ?? []).some((c) => userCohorts.includes(c));
+    (course.availability === "all" ||
+      (course.assignedCohortIds ?? []).some((c) => userCohorts.includes(c)));
   if (!ok) {
     throw new HttpsError("permission-denied", "You do not have access to this course.");
   }
