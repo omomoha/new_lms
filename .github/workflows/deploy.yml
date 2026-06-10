@@ -61,8 +61,8 @@ jobs:
       # emulator fully offline (no credentials touched).
       - name: Firestore security-rules tests (emulator)
         run: |
-          npx firebase-tools@13 experiments:enable webframeworks
-          npx firebase-tools@13 emulators:exec --only firestore --project demo-andela-lms "npm run test:rules"
+          npx firebase-tools@15 experiments:enable webframeworks
+          npx firebase-tools@15 emulators:exec --only firestore --project demo-andela-lms "npm run test:rules"
 
   # ── Build + deploy everything (main only) ───────────────────────────────────
   deploy:
@@ -109,13 +109,15 @@ jobs:
           AI_MODEL: ${{ secrets.AI_MODEL }}
 
       - name: Enable Next.js web-frameworks support
-        run: npx firebase-tools@13 experiments:enable webframeworks
+        run: npx firebase-tools@15 experiments:enable webframeworks
 
       # One deploy covers everything: the frameworks adapter runs `next build`
       # here (with the NEXT_PUBLIC_* env baked in), firebase.json's predeploy
       # hook installs + compiles functions, and rules deploy alongside.
+      # --debug so failures surface their real cause instead of
+      # "An unexpected error has occurred."
       - name: Deploy to Firebase
-        run: npx firebase-tools@13 deploy --project "$PROJECT_ID" --non-interactive --force
+        run: npx firebase-tools@15 deploy --project "$PROJECT_ID" --non-interactive --force --debug
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
