@@ -89,6 +89,25 @@ jobs:
           ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           EOF
 
+      # AI features: the Claude API key is injected from a GitHub secret into
+      # functions/.env (gitignored) — firebase-tools uploads .env values to the
+      # functions runtime at deploy. If the secret is unset, AI callables
+      # return failed-precondition and everything else works normally.
+      - name: Write functions runtime env
+        run: |
+          if [ -n "${ANTHROPIC_API_KEY}" ]; then
+            {
+              echo "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}"
+              if [ -n "${AI_MODEL}" ]; then echo "AI_MODEL=${AI_MODEL}"; fi
+            } >> functions/.env
+            echo "functions/.env written (AI features enabled)"
+          else
+            echo "ANTHROPIC_API_KEY secret not set — deploying with AI features disabled"
+          fi
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AI_MODEL: ${{ secrets.AI_MODEL }}
+
       - name: Enable Next.js web-frameworks support
         run: npx firebase-tools@13 experiments:enable webframeworks
 
