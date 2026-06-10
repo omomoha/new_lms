@@ -26,6 +26,8 @@
 import { useEffect, useState } from "react";
 import { getResourceUrl, getDocRenderKind, type DocRenderKind } from "@/lib/files";
 import TextLessonContent from "./TextLessonContent";
+import PagedDocContent from "./PagedDocContent";
+import PdfPagedViewer from "./PdfPagedViewer";
 
 interface DocumentViewerProps {
   filePath?: string; // Firebase Storage path (preferred)
@@ -95,38 +97,61 @@ export default function DocumentViewer({ filePath, fileUrl, title }: DocumentVie
     );
   }
 
-  // Native interactive rendering (md / txt / docx)
-  if (kind === "text" || kind === "docx") {
+  // Native interactive rendering: md / txt single-flow, docx paginated
+  if (kind === "text") {
     if (nativeContent === null) return <ViewerSkeleton height="40vh" />;
     return <TextLessonContent content={nativeContent} />;
+  }
+  if (kind === "docx") {
+    if (nativeContent === null) return <ViewerSkeleton height="40vh" />;
+    return <PagedDocContent html={nativeContent} />;
   }
 
   if (!url) return <ViewerSkeleton height="70vh" />;
 
+  // PDF — page-by-page reader (pdf.js): Prev/Next, page jump, arrow keys
   if (kind === "pdf") {
-    return (
-      <iframe
-        src={`${url}#toolbar=0&navpanes=0`}
-        title={title}
-        className="w-full rounded-xl border"
-        style={{ height: "70vh", borderColor: "#DDE6DF" }}
-      />
-    );
+    return <PdfPagedViewer url={url} title={title} />;
   }
 
-  // Office formats (pptx, ppt, legacy doc, xlsx, …) — interactive embed
+  // Office formats (pptx, ppt, legacy doc, xlsx, …) — third-party embeds.
+  // These depend on an external service fetching the file; when that fails
+  // (e.g. "File not found"), the alternative viewer or a PDF re-upload is
+  // the reliable path.
+  return <OfficeEmbed url={url} title={title} />;
+}
+
+function OfficeEmbed({ url, title }: { url: string; title: string }) {
+  const [provider, setProvider] = useState<"office" | "google">("office");
+  const src =
+    provider === "office"
+      ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
+      : `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(url)}`;
+
   return (
     <>
       <iframe
-        src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`}
+        key={provider}
+        src={src}
         title={title}
-        className="w-full rounded-xl border"
-        style={{ height: "70vh", borderColor: "#DDE6DF" }}
+        className="w-full rounded-xl border border-brand-line"
+        style={{ height: "70vh" }}
         allowFullScreen
       />
-      <p className="text-xs mt-1 text-brand-muted">
-        Preview rendered via Microsoft Office Online.
-      </p>
+      <div className="flex items-center justify-between mt-1 gap-2 flex-wrap">
+        <p className="text-xs text-brand-muted">
+          Preview rendered via {provider === "office" ? "Microsoft Office Online" : "Google Docs Viewer"}.
+          {" "}If it shows an error, try the other viewer — or ask your admin to
+          upload this deck as a PDF for the best page-by-page experience.
+        </p>
+        <button
+          type="button"
+          onClick={() => setProvider((p) => (p === "office" ? "google" : "office"))}
+          className="text-xs text-brand-teal hover:underline flex-shrink-0"
+        >
+          Try {provider === "office" ? "Google Docs Viewer" : "Office Online"} instead
+        </button>
+      </div>
     </>
   );
 }
