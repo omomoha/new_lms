@@ -85,7 +85,10 @@ export default function CourseBuilderPage() {
       const call = httpsCallable<{ outline: string; titleHint?: string }, GenerateResponse>(
         functions,
         "generateCourseOutline"
-      );
+      , {
+        // Firebase callable clients default to 70s — AI/conversion calls need longer
+        timeout: 300000,
+      });
       const res = await call({
         outline,
         ...(titleHint.trim() ? { titleHint: titleHint.trim() } : {}),

@@ -118,7 +118,10 @@ export default function ReviewPage() {
       const fn = httpsCallable<GenerateFlashcardsRequest, GenerateFlashcardsResponse>(
         functions,
         "generateFlashcards"
-      );
+      , {
+        // Firebase callable clients default to 70s — AI/conversion calls need longer
+        timeout: 180000,
+      });
       const res = await fn({ courseId: selectedCourseId });
       const title = courses.find((c) => c.id === selectedCourseId)?.title ?? "this course";
       setGenSuccess(`Created ${res.data.count} cards for ${title}. They're due now — start reviewing!`);

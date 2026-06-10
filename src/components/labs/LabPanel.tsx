@@ -178,7 +178,10 @@ export default function LabPanel({ courseId, moduleId, lessonId }: LabPanelProps
     setSubmitting(true);
     setError(null);
     try {
-      const fn = httpsCallable<GradeLabRequest, LabGradeResult>(functions, "gradeLab");
+      const fn = httpsCallable<GradeLabRequest, LabGradeResult>(functions, "gradeLab", {
+        // Callable client default is 70s — grading can exceed it
+        timeout: 180000,
+      });
       const res = await fn({ courseId, moduleId, lessonId, code: trimmed, language });
       setResult(res.data);
       setPrevious((prev) => ({ ...prev, ...res.data, language }));

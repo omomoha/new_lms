@@ -102,7 +102,9 @@ export default function AdminDashboardPage() {
     try {
       const backfill = httpsCallable<Record<string, never>, BackfillResponse>(
         functionsUsEast1,
-        "backfillOfficeConversions"
+        "backfillOfficeConversions",
+        // Callable client default is 70s; a conversion batch can take minutes
+        { timeout: 540000 }
       );
       const res = await backfill({});
       setBackfillResult(res.data);

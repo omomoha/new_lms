@@ -309,7 +309,9 @@ export default function QuizEditor({
         : 5;
       const generateFn = httpsCallable<GenerateAssessmentRequest, GenerateAssessmentResponse>(
         functions,
-        "generateAssessment"
+        "generateAssessment",
+        // Callable client default is 70s — generation can exceed it
+        { timeout: 240000 }
       );
       const result = await generateFn({
         courseId,

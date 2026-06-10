@@ -75,7 +75,9 @@ export default function TutorPanel({ courseId, moduleId, lessonId }: TutorPanelP
     try {
       const askTutor = httpsCallable<AskTutorRequest, AskTutorResponse>(
         functions,
-        "askTutor"
+        "askTutor",
+        // Callable client default is 70s — long answers can exceed it
+        { timeout: 120000 }
       );
       const res = await askTutor({
         courseId,

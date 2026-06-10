@@ -75,7 +75,10 @@ export default function AdminCopilotPage() {
         const fn = httpsCallable<AdminCopilotRequest, AdminCopilotResponse>(
           functions,
           "adminCopilot"
-        );
+        , {
+        // Firebase callable clients default to 70s — AI/conversion calls need longer
+        timeout: 120000,
+      });
         const res = await fn({ question });
         setExchanges((prev) =>
           prev.map((ex, i) =>
