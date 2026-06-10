@@ -15,13 +15,21 @@ import CourseSearch from "@/components/learn/CourseSearch";
 import StreakCard from "@/components/learn/StreakCard";
 import { pickResumeCourse } from "@/lib/resume";
 import { filterCourses } from "@/lib/search";
+import { resolveDueDate, dueBadge, type DueDateCohort } from "@/lib/dueDates";
 
 type CourseWithAccess = Course & {
   progressPct: number;
   hasAccess: boolean;
   updatedAtMillis: number | null;
   lastLessonId: string | null;
+  dueMillis: number | null;
 };
+
+const DUE_TONE_CLASSES = {
+  muted: "bg-brand-mint text-brand-primary",
+  warn: "bg-amber-100 text-amber-800",
+  overdue: "bg-red-100 text-red-700",
+} as const;
 
 export default function LearnDashboard() {
   const { appUser } = useAuth();
@@ -65,6 +73,24 @@ export default function LearnDashboard() {
           console.warn("LearnDashboard: fresh cohort read failed, using cached:", err);
         }
 
+        // Per-cohort course due dates — fetch the user's cohort docs (members
+        // may read their own cohorts). Fail soft: ANY fetch error → no badges.
+        let dueDateCohorts: DueDateCohort[] = [];
+        try {
+          const cohortSnaps = await Promise.all(
+            userCohortIds.map((id) => getDoc(doc(db, "cohorts", id)))
+          );
+          dueDateCohorts = cohortSnaps
+            .filter((s) => s.exists())
+            .map((s) => {
+              const data = s.data() as DueDateCohort;
+              return { courseDueDates: data.courseDueDates };
+            });
+        } catch (err: unknown) {
+          console.warn("LearnDashboard: cohort due-date read failed, skipping badges:", err);
+          dueDateCohorts = [];
+        }
+
         // Fetch enrollments for progress (only matters for accessible courses)
         const withAccessAndProgress = await Promise.all(
           allPublished.map(async (c) => {
@@ -86,7 +112,11 @@ export default function LearnDashboard() {
               }
             }
 
-            return { ...c, progressPct, hasAccess, updatedAtMillis, lastLessonId };
+            const dueMillis = hasAccess
+              ? resolveDueDate(c.id, dueDateCohorts)
+              : null;
+
+            return { ...c, progressPct, hasAccess, updatedAtMillis, lastLessonId, dueMillis };
           })
         );
 
@@ -173,8 +203,11 @@ export default function LearnDashboard() {
               </div>
             ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {visibleCourses.map((c) =>
-              c.hasAccess ? (
+            {visibleCourses.map((c) => {
+              const badge = c.hasAccess
+                ? dueBadge(c.dueMillis, Date.now(), c.progressPct)
+                : null;
+              return c.hasAccess ? (
                 <Link
                   key={c.id}
                   href={`/learn/course/${c.id}`}
@@ -197,6 +230,13 @@ export default function LearnDashboard() {
                       <p className="text-sm line-clamp-2 mb-3 text-brand-muted">{c.description}</p>
                     )}
                     <div>
+                      {badge && (
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mb-2 ${DUE_TONE_CLASSES[badge.tone]}`}
+                        >
+                          {badge.label}
+                        </span>
+                      )}
                       <div className="flex justify-between text-xs mb-1 text-brand-muted">
                         <span>Progress</span>
                         <span className="text-brand-teal font-semibold">{c.progressPct}%</span>
@@ -245,8 +285,8 @@ export default function LearnDashboard() {
                     </p>
                   </div>
                 </div>
-              )
-            )}
+              );
+            })}
           </div>
             )}
           </>

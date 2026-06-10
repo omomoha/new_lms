@@ -11,7 +11,8 @@ export { syncRoleClaim } from "./syncRoleClaim";
 export { parseAssessmentDoc } from "./parseAssessmentDoc";
 export { getSignedVideoUrl } from "./getSignedVideoUrl";
 export { transcodeVideo } from "./transcodeVideo";
-export { convertOfficeToPdf } from "./convertOfficeToPdf";
+export { convertOfficeToPdf, backfillOfficeConversions } from "./convertOfficeToPdf";
+export { transcribeVideo } from "./transcribeVideo";
 export {
   issueCertificate,
   autoIssueCertificate,

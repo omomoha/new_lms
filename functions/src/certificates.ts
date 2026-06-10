@@ -496,6 +496,22 @@ async function issueCertificateCore(
     });
   }
 
+  // In-app notification — written on every fresh issuance (even when the
+  // email is suppressed). Best-effort: a failure here must never break or
+  // roll back certificate issuance.
+  try {
+    await db.collection("notifications").add({
+      userId: uid,
+      title: stripNewlines("Certificate earned 🎓").slice(0, 150),
+      body: stripNewlines(`Your certificate for "${courseTitle}" is ready.`).slice(0, 500),
+      link: `/learn/course/${courseId}`,
+      readAt: null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn("certificate notification write failed (non-fatal):", err);
+  }
+
   return { certId, downloadUrl, issuedAt: Date.now(), alreadyIssued: false };
 }
 

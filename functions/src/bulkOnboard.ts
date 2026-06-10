@@ -260,11 +260,12 @@ export const bulkOnboard = onCall(
           to: email,
           message: {
             subject: "Welcome to Andela Learn — set your password",
-            text: `Hi ${safeName},\n\nYour Andela Learn account is ready.\n\nEmail: ${email}\n\nPlease set your password using the link below (valid for 1 hour):\n${resetLink}\n\nAndela Team`,
+            text: `Hi ${safeName},\n\nYour Andela Learn account is ready.\n\nEmail: ${email}\n\nPlease set your password using the link below (valid for 1 hour):\n${resetLink}\n\nIf the link has expired, open ${process.env.PUBLIC_APP_URL || "https://andela-lms-dae5f.web.app"}/auth/login and use "Forgot password?" to get a fresh one.\n\nAndela Team`,
             html: `<p>Hi ${escapeHtml(safeName)},</p>
 <p>Your <strong>Andela Learn</strong> account is ready.</p>
 <p>Email: <strong>${escapeHtml(email)}</strong></p>
 <p><a href="${resetLink}">Set your password</a> (link valid for 1 hour)</p>
+<p style="color:#5E6E69;font-size:13px;">Link expired? Open <a href="${process.env.PUBLIC_APP_URL || "https://andela-lms-dae5f.web.app"}/auth/login">the sign-in page</a> and use “Forgot password?” to get a fresh one.</p>
 <p>— Andela Team</p>`,
           },
         });

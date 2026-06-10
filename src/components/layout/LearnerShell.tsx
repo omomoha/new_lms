@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
+import NotificationsBell from "@/components/notifications/NotificationsBell";
 
 export default function LearnerShell({ children }: { children: React.ReactNode }) {
   const { user, appUser, loading, signOut } = useAuth();
@@ -24,6 +25,13 @@ export default function LearnerShell({ children }: { children: React.ReactNode }
           Andela <span className="text-white font-light">LMS</span>
         </Link>
         <div className="flex items-center gap-3">
+          {user && <NotificationsBell uid={user.uid} />}
+          <Link
+            href="/learn/profile"
+            className="text-xs text-white/70 hover:text-white transition-colors"
+          >
+            Profile
+          </Link>
           <Link
             href="/learn/review"
             className="text-xs text-white/70 hover:text-white transition-colors"

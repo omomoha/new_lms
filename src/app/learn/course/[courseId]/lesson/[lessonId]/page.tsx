@@ -27,6 +27,7 @@ import TextLessonContent from "@/components/lessons/TextLessonContent";
 import LessonFeedback from "@/components/learn/LessonFeedback";
 import TutorPanel from "@/components/tutor/TutorPanel";
 import LabPanel from "@/components/labs/LabPanel";
+import DiscussionPanel from "@/components/discussions/DiscussionPanel";
 
 export default function LessonPage() {
   const params = useParams();
@@ -529,6 +530,11 @@ export default function LessonPage() {
               moduleId={currentModuleId ?? undefined}
               lessonId={lessonId}
             />
+          </div>
+
+          {/* Discussion / Q&A — every lesson type */}
+          <div className="mt-8">
+            <DiscussionPanel courseId={courseId} lessonId={lessonId} />
           </div>
 
           {/* Lesson feedback — shown for every lesson type, below the content */}

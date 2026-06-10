@@ -26,6 +26,8 @@ import {
   deleteDoc,
   arrayUnion,
   arrayRemove,
+  deleteField,
+  Timestamp,
 } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
 import { uploadResource } from "@/lib/files";
@@ -38,6 +40,20 @@ import { Badge } from "@/components/ui/Badge";
 import { EntityThumb } from "@/components/ui/Thumb";
 
 const COLORS = ["#2C7A6B", "#7FB069", "#13403A", "#C9772F", "#5E6E69"];
+
+// Local extension — cohort docs may carry an optional per-course due-date map
+// (src/types.ts stays untouched; admin-only writes via dot-path updates).
+type CohortWithDueDates = Cohort & {
+  courseDueDates?: Record<string, Timestamp>;
+};
+
+/** Format a Firestore Timestamp as the yyyy-MM-dd value a date input expects. */
+function toDateInputValue(ts: Timestamp | undefined): string {
+  if (!ts) return "";
+  const d = ts.toDate();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 // ── Analytics types ──────────────────────────────────────────────────────────
 
@@ -72,7 +88,7 @@ export default function CohortDetailPage() {
     );
   };
 
-  const [cohort, setCohort] = useState<Cohort | null>(null);
+  const [cohort, setCohort] = useState<CohortWithDueDates | null>(null);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,6 +107,7 @@ export default function CohortDetailPage() {
   // Member / course chip busy states
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [busyCourseId, setBusyCourseId] = useState<string | null>(null);
+  const [busyDueCourseId, setBusyDueCourseId] = useState<string | null>(null);
 
   // Search
   const [userSearch, setUserSearch] = useState("");
@@ -112,7 +129,7 @@ export default function CohortDetailPage() {
         router.push("/admin/cohorts");
         return;
       }
-      const cohortData = { id: cohortSnap.id, ...cohortSnap.data() } as Cohort;
+      const cohortData = { id: cohortSnap.id, ...cohortSnap.data() } as CohortWithDueDates;
       setCohort(cohortData);
       setEditName(cohortData.name);
       setEditTag(cohortData.tag);
@@ -302,6 +319,54 @@ export default function CohortDetailPage() {
       setError(err instanceof Error ? err.message : "Failed to update course");
     } finally {
       setBusyCourseId(null);
+    }
+  };
+
+  // ── Course due date ─────────────────────────────────────────────────────────
+  // Set (value = "yyyy-MM-dd") or clear (value = "") the per-cohort due date
+  // for a course via a dot-path update on cohorts/{id}.courseDueDates.
+  const setCourseDueDate = async (course: Course, value: string) => {
+    if (!cohort) return;
+    setBusyDueCourseId(course.id);
+    setError(null);
+    try {
+      if (value) {
+        // End of the chosen day, local time.
+        const ts = Timestamp.fromDate(new Date(value + "T23:59:59"));
+        await updateDoc(doc(db, "cohorts", cohortId), {
+          [`courseDueDates.${course.id}`]: ts,
+        });
+        audit(
+          "cohort.course.due",
+          `Set due date for "${course.title}" to ${value}`
+        );
+        setCohort((prev) =>
+          prev
+            ? {
+                ...prev,
+                courseDueDates: {
+                  ...(prev.courseDueDates ?? {}),
+                  [course.id]: ts,
+                },
+              }
+            : prev
+        );
+      } else {
+        await updateDoc(doc(db, "cohorts", cohortId), {
+          [`courseDueDates.${course.id}`]: deleteField(),
+        });
+        audit("cohort.course.due", `Cleared due date for "${course.title}"`);
+        setCohort((prev) => {
+          if (!prev) return prev;
+          const rest = { ...(prev.courseDueDates ?? {}) };
+          delete rest[course.id];
+          return { ...prev, courseDueDates: rest };
+        });
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update due date");
+    } finally {
+      setBusyDueCourseId(null);
     }
   };
 
@@ -767,6 +832,36 @@ export default function CohortDetailPage() {
                       </p>
                     )}
                   </div>
+                  {assigned && (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <label
+                        htmlFor={`due-${course.id}`}
+                        className="text-xs text-brand-muted"
+                      >
+                        Due
+                      </label>
+                      <input
+                        id={`due-${course.id}`}
+                        type="date"
+                        className="input-field !px-2 !py-1 !text-xs !w-auto"
+                        value={toDateInputValue(cohort.courseDueDates?.[course.id])}
+                        disabled={busyDueCourseId === course.id}
+                        onChange={(e) => setCourseDueDate(course, e.target.value)}
+                      />
+                      {cohort.courseDueDates?.[course.id] && (
+                        <button
+                          type="button"
+                          disabled={busyDueCourseId === course.id}
+                          onClick={() => setCourseDueDate(course, "")}
+                          className="px-1.5 py-0.5 rounded text-xs text-brand-muted hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title={`Clear due date for "${course.title}"`}
+                          aria-label={`Clear due date for "${course.title}"`}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  )}
                   <button
                     disabled={busyCourseId === course.id}
                     onClick={() => toggleCourse(course)}

@@ -4,7 +4,8 @@
  * Fires every Monday at 09:00 Africa/Lagos time (one hour after the admin
  * weeklyDigest). Finds learners with in-progress enrollments
  * (0 < progressPct < 100), and writes a friendly nudge email to the `mail`
- * collection (Trigger Email extension) for each — at most once per learner
+ * collection (Trigger Email extension) plus a matching in-app notification
+ * to the `notifications` collection for each — at most once per learner
  * per course every 14 days (tracked via enrollment.lastNudgedAt).
  *
  * Safety:
@@ -12,7 +13,8 @@
  *  - Skips courses that are missing or not published.
  *  - HTML-escapes the learner name and course title (Firestore content is
  *    untrusted in an HTML email body).
- *  - Caps at 200 emails per run.
+ *  - Caps at 150 nudges per run (3 batch ops each: mail + notification +
+ *    enrollment update = 450 ops, under the 500-op batch limit).
  *
  * NEW FIRESTORE FIELD: enrollments/{id}.lastNudgedAt (Timestamp) — written
  * here via the Admin SDK only.
@@ -25,7 +27,9 @@ if (!admin.apps.length) admin.initializeApp();
 
 const db = admin.firestore();
 
-const MAX_EMAILS_PER_RUN = 200;
+// 3 batch ops per nudge (mail set + notification set + enrollment update):
+// 150 × 3 = 450 ops, safely under Firestore's 500-op batch limit.
+const MAX_EMAILS_PER_RUN = 150;
 const NUDGE_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
 
 // Same pattern as bulkOnboard.ts — escape untrusted strings before HTML.
@@ -210,6 +214,15 @@ export const learnerReminders = onSchedule(
           text: buildText(user.name, courseTitle, pct, courseUrl),
         },
       });
+      // Matching in-app notification (plain text, single-line, length-capped).
+      batch.set(db.collection("notifications").doc(), {
+        userId: enrollment.userId,
+        title: "Pick up where you left off",
+        body: subjectSafe(`You're ${pct}% through "${courseTitle}" — keep going!`, 500),
+        link: `/learn/course/${encodeURIComponent(enrollment.courseId)}`,
+        readAt: null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
       batch.update(enrollmentDoc.ref, {
         lastNudgedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -217,7 +230,7 @@ export const learnerReminders = onSchedule(
     }
 
     if (queued > 0) {
-      // ≤ 200 emails × 2 ops = ≤ 400 writes — under the 500-op batch limit.
+      // ≤ 150 nudges × 3 ops = ≤ 450 writes — under the 500-op batch limit.
       await batch.commit();
     }
 

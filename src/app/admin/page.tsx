@@ -18,9 +18,16 @@ import {
   limit,
   Timestamp,
 } from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import db from "@/lib/firebase/firestore";
+import app from "@/lib/firebase/config";
 import AdminShell from "@/components/layout/AdminShell";
 import { Spinner } from "@/components/ui/Spinner";
+
+// backfillOfficeConversions is co-located with the storage trigger in
+// us-east1 (the bucket's region); the shared default instance from
+// "@/lib/firebase/functions" targets us-central1, so bind explicitly.
+const functionsUsEast1 = getFunctions(app, "us-east1");
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +51,14 @@ interface CourseCompletion {
   title: string;
   completed: number;
   enrolled: number;
+}
+
+/** Response shape of the backfillOfficeConversions callable. */
+interface BackfillResponse {
+  totalCandidates: number;
+  converted: string[];
+  failed: Array<{ name: string; error: string }>;
+  remaining: number;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -74,6 +89,32 @@ export default function AdminDashboardPage() {
   const [completions, setCompletions] = useState<CourseCompletion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Legacy deck conversion (backfill) state ─────────────────────────────────
+  const [backfillRunning, setBackfillRunning] = useState(false);
+  const [backfillResult, setBackfillResult] = useState<BackfillResponse | null>(null);
+  const [backfillError, setBackfillError] = useState<string | null>(null);
+  const [convertedTotal, setConvertedTotal] = useState(0);
+
+  async function runBackfillBatch() {
+    setBackfillRunning(true);
+    setBackfillError(null);
+    try {
+      const backfill = httpsCallable<Record<string, never>, BackfillResponse>(
+        functionsUsEast1,
+        "backfillOfficeConversions"
+      );
+      const res = await backfill({});
+      setBackfillResult(res.data);
+      setConvertedTotal((prev) => prev + res.data.converted.length);
+    } catch (err: unknown) {
+      setBackfillError(
+        err instanceof Error ? err.message : "Conversion request failed"
+      );
+    } finally {
+      setBackfillRunning(false);
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -399,6 +440,93 @@ export default function AdminDashboardPage() {
           </section>
         </>
       )}
+
+      {/* ── Admin tools ──────────────────────────────────────────────────────── */}
+      <section className="mb-8">
+        <h2 className="text-xs font-semibold uppercase tracking-widest mb-4 text-brand-muted">
+          Admin tools
+        </h2>
+        <div className="card">
+          <h3 className="text-sm font-semibold text-brand-ink">
+            Convert legacy decks to PDF
+          </h3>
+          <p className="mt-1 text-sm text-brand-muted">
+            PPTX, PPT and DOC lesson files uploaded before automatic conversion
+            was enabled have no PDF twin. Run this to convert them so learners
+            get the paginated reader instead of the Office embed.
+          </p>
+
+          {/* Progress / result states */}
+          {backfillRunning && (
+            <p className="mt-3 text-sm font-medium text-brand-primary">
+              Converting… this can take a few minutes.
+            </p>
+          )}
+
+          {!backfillRunning && backfillResult && (
+            <>
+              {backfillResult.remaining === 0 &&
+              backfillResult.failed.length === 0 ? (
+                <p className="mt-3 text-sm font-semibold text-brand-primary">
+                  All decks converted ✓
+                </p>
+              ) : (
+                <p className="mt-3 text-sm font-medium text-brand-ink">
+                  Converted {convertedTotal}, {backfillResult.remaining}{" "}
+                  remaining…
+                </p>
+              )}
+
+              {backfillResult.failed.length > 0 && (
+                <div className="rounded-lg p-3 mt-3 text-sm bg-red-100 text-red-800">
+                  <p className="font-semibold mb-1">
+                    {backfillResult.failed.length}{" "}
+                    {backfillResult.failed.length === 1 ? "file" : "files"}{" "}
+                    could not be converted:
+                  </p>
+                  <ul className="list-disc pl-5 space-y-0.5">
+                    {backfillResult.failed.map((f) => (
+                      <li key={f.name} className="break-all">
+                        <span className="font-medium">{f.name}</span> —{" "}
+                        {f.error}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+
+          {backfillError && (
+            <div className="rounded-lg p-3 mt-3 text-sm bg-red-100 text-red-800">
+              Conversion failed: {backfillError}. Please try again.
+            </div>
+          )}
+
+          {/* One batch per click — the function is expensive, so no auto-loop. */}
+          {!(
+            backfillResult &&
+            backfillResult.remaining === 0 &&
+            backfillResult.failed.length === 0
+          ) && (
+            <button
+              type="button"
+              onClick={runBackfillBatch}
+              disabled={backfillRunning}
+              className="btn-primary mt-4"
+            >
+              {backfillRunning
+                ? "Converting…"
+                : backfillResult
+                ? "Convert next batch"
+                : "Convert legacy decks to PDF"}
+            </button>
+          )}
+          <p className="mt-2 text-xs text-brand-muted">
+            Each batch converts up to 5 files and can take a few minutes.
+          </p>
+        </div>
+      </section>
     </AdminShell>
   );
 }

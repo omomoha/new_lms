@@ -53,7 +53,15 @@ service cloud.firestore {
         || (isOwner(uid)
             && request.resource.data.uid == uid
             && request.resource.data.role == "learner");
-      allow update, delete: if isAdmin();
+      // Self-service: a user may update ONLY their own display name.
+      // Everything else (role, cohortIds, status, …) stays admin-only.
+      allow update: if isAdmin()
+        || (isOwner(uid)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["name"])
+            && request.resource.data.name is string
+            && request.resource.data.name.size() >= 2
+            && request.resource.data.name.size() <= 100);
+      allow delete: if isAdmin();
     }
 
     // ── cohorts/{id} ────────────────────────────────────────────────────────
@@ -221,6 +229,47 @@ service cloud.firestore {
         && request.resource.data.details is string
         && request.resource.data.details.size() <= 1000;
       allow update, delete: if false; // append-only
+    }
+
+    // ── notifications/{id} ──────────────────────────────────────────────────
+    // Created ONLY by Cloud Functions (certificates, reminders). The owner
+    // may read their own and mark them read — nothing else.
+    match /notifications/{noteId} {
+      allow read: if isAdmin()
+        || (isAuthed() && resource.data.userId == request.auth.uid);
+      allow update: if isAuthed()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["readAt"]);
+      allow create, delete: if false; // server-side only
+    }
+
+    // ── discussions/{id} ────────────────────────────────────────────────────
+    // Per-lesson Q&A. Create-only from clients (no edits); author or admin
+    // may delete. Reads/creates are gated on course access — same cohort
+    // check as assessments (queries must filter by lessonId/courseId so the
+    // get()-based rule stays provable per-document).
+    match /discussions/{postId} {
+      allow read: if isAdmin()
+        || (isLearner()
+            && get(/databases/$(database)/documents/courses/$(resource.data.courseId)).data.assignedCohortIds.hasAny(
+                 get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cohortIds
+               ));
+      allow create: if isAuthed()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.body is string
+        && request.resource.data.body.size() >= 1
+        && request.resource.data.body.size() <= 2000
+        && request.resource.data.userName is string
+        && request.resource.data.userName.size() <= 100
+        && (request.resource.data.parentId == null
+            || request.resource.data.parentId is string)
+        && (isAdmin()
+            || get(/databases/$(database)/documents/courses/$(request.resource.data.courseId)).data.assignedCohortIds.hasAny(
+                 get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cohortIds
+               ));
+      allow delete: if isAdmin()
+        || (isAuthed() && resource.data.userId == request.auth.uid);
+      allow update: if false; // no edits — delete and repost
     }
 
     // ── mail/{id} ───────────────────────────────────────────────────────────
