@@ -118,7 +118,7 @@ export default function LearnDashboard() {
 
   return (
     <LearnerShell>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         {/* Learner hero band */}
         <div className="page-hero mb-6">
           <span className="kicker">MY LEARNING</span>
@@ -172,7 +172,7 @@ export default function LearnDashboard() {
                 <p className="text-sm">No courses match your search. Try a different term.</p>
               </div>
             ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {visibleCourses.map((c) =>
               c.hasAccess ? (
                 <Link
