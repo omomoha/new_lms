@@ -42,7 +42,11 @@ interface AuthContextValue {
   appUser: AppUser | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (
+    name: string,
+    email: string,
+    password: string
+  ) => Promise<{ verificationSent: boolean }>;
   signOut: () => Promise<void>;
 }
 
@@ -168,10 +172,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     // Firebase's built-in transactional email (same system as password
     // resets — templates under Console → Authentication → Templates).
-    await sendEmailVerification(cred.user).catch(() => undefined);
+    // Don't swallow failures silently: the register page tells the user
+    // how to get a fresh link (signing in re-sends automatically).
+    let verificationSent = true;
+    try {
+      await sendEmailVerification(cred.user);
+    } catch (err) {
+      console.error("sendEmailVerification failed:", err);
+      verificationSent = false;
+    }
     // No session until the address is verified: sign straight out. The
     // register page shows the "check your inbox" state.
     await firebaseSignOut(getClientAuth());
+    return { verificationSent };
   };
 
   const signOut = async () => {

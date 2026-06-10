@@ -13,6 +13,7 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [verifySent, setVerifySent] = useState(false);
+  const [sendFailed, setSendFailed] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -31,7 +32,8 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      await register(name.trim(), email.trim(), password);
+      const { verificationSent } = await register(name.trim(), email.trim(), password);
+      setSendFailed(!verificationSent);
       setVerifySent(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Registration failed";
@@ -63,9 +65,15 @@ export default function RegisterPage() {
           <h1 className="font-serif-brand text-xl font-normal mb-2 text-brand-primary">
             Verify your email
           </h1>
-          <p className="text-sm text-brand-muted mb-4">
-            We sent a verification link to <b className="text-brand-ink">{email.trim()}</b>.
-            Click it, then sign in. (Check spam if it doesn&apos;t arrive in a minute.)
+          <p className="text-sm text-brand-muted mb-2">
+            {sendFailed
+              ? "We couldn't send the verification email just now."
+              : <>We sent a verification link to <b className="text-brand-ink">{email.trim()}</b>. Click it, then sign in.</>}
+          </p>
+          <p className="text-xs text-brand-muted mb-4">
+            {sendFailed
+              ? "No problem — sign in with your new password and we'll automatically send you a fresh link."
+              : "Didn't get it? Check spam — or just sign in and we'll automatically send a fresh link."}
           </p>
           <Link href="/auth/login" className="btn-primary w-full py-2.5 inline-flex">
             Go to sign in
