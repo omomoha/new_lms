@@ -142,8 +142,10 @@ jobs:
           for deb in *.deb; do
             [ -e "$deb" ] && dpkg-deb -x "$deb" extract/ || true
           done
-          cp -a extract/usr/lib/x86_64-linux-gnu/. "$GITHUB_WORKSPACE/functions/vendor-libs/" 2>/dev/null || true
-          cp -a extract/lib/x86_64-linux-gnu/. "$GITHUB_WORKSPACE/functions/vendor-libs/" 2>/dev/null || true
+          # -L dereferences symlinks: deploy packaging flattens symlinks into
+          # stub text files ("libX11.so.6: file too short" in production)
+          cp -aL extract/usr/lib/x86_64-linux-gnu/. "$GITHUB_WORKSPACE/functions/vendor-libs/" 2>/dev/null || true
+          cp -aL extract/lib/x86_64-linux-gnu/. "$GITHUB_WORKSPACE/functions/vendor-libs/" 2>/dev/null || true
           find extract -name "*.ttf" -exec cp {} "$GITHUB_WORKSPACE/functions/vendor-libs/fonts/" \; 2>/dev/null || true
           echo "Vendored $(ls "$GITHUB_WORKSPACE/functions/vendor-libs" | wc -l) entries:"
           ls "$GITHUB_WORKSPACE/functions/vendor-libs" | head -40
