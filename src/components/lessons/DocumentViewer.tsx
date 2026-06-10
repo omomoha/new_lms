@@ -40,6 +40,7 @@ export default function DocumentViewer({ filePath, fileUrl, title }: DocumentVie
   const kind: DocRenderKind | null = source ? getDocRenderKind(source) : null;
 
   const [url, setUrl] = useState<string | null>(null);
+  const [convertedPdfUrl, setConvertedPdfUrl] = useState<string | null>(null);
   const [nativeContent, setNativeContent] = useState<string | null>(null); // md/txt text or docx HTML
   const [error, setError] = useState<string | null>(null);
 
@@ -47,11 +48,26 @@ export default function DocumentViewer({ filePath, fileUrl, title }: DocumentVie
     if (!source || !kind) return;
     let cancelled = false;
     setUrl(null);
+    setConvertedPdfUrl(null);
     setNativeContent(null);
     setError(null);
 
     (async () => {
       try {
+        // Office formats: the convertOfficeToPdf function stores a converted
+        // twin at "<path>.pdf" — prefer it (paginated reader beats embeds).
+        if (kind === "office" && filePath) {
+          try {
+            const pdfUrl = await getResourceUrl(`${filePath}.pdf`);
+            if (!cancelled) {
+              setConvertedPdfUrl(pdfUrl);
+              return;
+            }
+          } catch {
+            // No converted twin (yet) — fall through to the embed path.
+          }
+        }
+
         const resolvedUrl = filePath ? await getResourceUrl(filePath) : (fileUrl as string);
         if (cancelled) return;
         setUrl(resolvedUrl);
@@ -107,6 +123,11 @@ export default function DocumentViewer({ filePath, fileUrl, title }: DocumentVie
     return <PagedDocContent html={nativeContent} />;
   }
 
+  // Office file with a server-converted PDF twin — paginated reader
+  if (kind === "office" && convertedPdfUrl) {
+    return <PdfPagedViewer url={convertedPdfUrl} title={title} />;
+  }
+
   if (!url) return <ViewerSkeleton height="70vh" />;
 
   // PDF — page-by-page reader (pdf.js): Prev/Next, page jump, arrow keys
@@ -141,8 +162,9 @@ function OfficeEmbed({ url, title }: { url: string; title: string }) {
       <div className="flex items-center justify-between mt-1 gap-2 flex-wrap">
         <p className="text-xs text-brand-muted">
           Preview rendered via {provider === "office" ? "Microsoft Office Online" : "Google Docs Viewer"}.
-          {" "}If it shows an error, try the other viewer — or ask your admin to
-          upload this deck as a PDF for the best page-by-page experience.
+          {" "}Just uploaded? A page-by-page PDF version is usually ready within
+          a couple of minutes — reload to get it. If the preview shows an
+          error, try the other viewer.
         </p>
         <button
           type="button"
