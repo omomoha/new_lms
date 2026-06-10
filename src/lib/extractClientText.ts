@@ -101,9 +101,58 @@ async function docxToText(buf: ArrayBuffer): Promise<string> {
   return value;
 }
 
+export type ExtractProgress = (message: string) => void;
+
+/** OCR pages cap — scanned decks beyond this are truncated (speed/memory). */
+const OCR_MAX_PAGES = 12;
+/** Render scale for OCR rasterisation — higher is more accurate but slower. */
+const OCR_SCALE = 2;
+
+/** OCR a scanned PDF: render each page to canvas (pdf.js), recognise with
+ *  tesseract.js (worker + language data fetched lazily from its CDN). */
+async function ocrPdf(buf: ArrayBuffer, onProgress?: ExtractProgress): Promise<string> {
+  const pdfjs = await import("pdfjs-dist");
+  pdfjs.GlobalWorkerOptions.workerSrc =
+    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+  const { createWorker } = await import("tesseract.js");
+
+  const doc = await pdfjs.getDocument({ data: buf }).promise;
+  const worker = await createWorker("eng");
+  try {
+    const pages = Math.min(doc.numPages, OCR_MAX_PAGES);
+    const parts: string[] = [];
+    for (let i = 1; i <= pages; i++) {
+      onProgress?.(`OCR — reading page ${i} of ${pages}…`);
+      const page = await doc.getPage(i);
+      const viewport = page.getViewport({ scale: OCR_SCALE });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new ExtractError("Could not prepare the page for OCR in this browser.");
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      const { data } = await worker.recognize(canvas);
+      parts.push(data.text ?? "");
+      canvas.width = 0; // release bitmap memory
+    }
+    if (doc.numPages > pages) {
+      onProgress?.(`OCR finished — first ${pages} of ${doc.numPages} pages used.`);
+    }
+    return parts.join("\n\n");
+  } finally {
+    await worker.terminate().catch(() => undefined);
+    void doc.destroy();
+  }
+}
+
 /** Extract plain text from an uploaded document. Throws ExtractError with a
- *  user-friendly message on unsupported/oversized/unreadable files. */
-export async function extractTextFromFile(file: File): Promise<string> {
+ *  user-friendly message on unsupported/oversized/unreadable files.
+ *  Scanned/image-only PDFs automatically fall back to in-browser OCR
+ *  (slower — onProgress receives per-page status strings). */
+export async function extractTextFromFile(
+  file: File,
+  onProgress?: ExtractProgress
+): Promise<string> {
   if (file.size > MAX_FILE_BYTES) {
     throw new ExtractError("File is too large (max 20 MB).");
   }
@@ -112,7 +161,13 @@ export async function extractTextFromFile(file: File): Promise<string> {
   let raw: string;
   try {
     if (ext === "pdf") {
-      raw = await pdfToText(await file.arrayBuffer());
+      const buf = await file.arrayBuffer();
+      raw = await pdfToText(buf.slice(0));
+      if (raw.replace(/\s+/g, "").length < 40) {
+        // No usable text layer — scanned/image-exported PDF. OCR it.
+        onProgress?.("No text layer found — running OCR (this takes a while)…");
+        raw = await ocrPdf(buf, onProgress);
+      }
     } else if (ext === "docx") {
       raw = await docxToText(await file.arrayBuffer());
     } else if (ext === "txt" || ext === "md" || ext === "markdown") {
@@ -133,7 +188,8 @@ export async function extractTextFromFile(file: File): Promise<string> {
   const text = raw.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
   if (text.length < 40) {
     throw new ExtractError(
-      "No readable text found in that file (scanned/image-only documents can't be used)."
+      "No readable text could be recovered from that file — even with OCR. " +
+        "If it's a low-quality scan, try the original document or paste the text manually."
     );
   }
   return text;

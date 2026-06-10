@@ -159,6 +159,7 @@ export default function QuizEditor({
   const [genNumQuestions, setGenNumQuestions] = useState(5);
   const [genSourceText, setGenSourceText] = useState("");
   const [extracting, setExtracting] = useState(false);
+  const [extractStatus, setExtractStatus] = useState<string | null>(null);
   const [extractedFrom, setExtractedFrom] = useState<string | null>(null);
   const sourceFileRef = useRef<HTMLInputElement>(null);
 
@@ -166,8 +167,9 @@ export default function QuizEditor({
     if (!file) return;
     setGenError(null);
     setExtracting(true);
+    setExtractStatus("Reading file…");
     try {
-      let text = await extractTextFromFile(file);
+      let text = await extractTextFromFile(file, (msg) => setExtractStatus(msg));
       const truncated = text.length > 30000;
       if (truncated) text = text.slice(0, 30000);
       setGenSourceText(text);
@@ -181,6 +183,7 @@ export default function QuizEditor({
       );
     } finally {
       setExtracting(false);
+      setExtractStatus(null);
       if (sourceFileRef.current) sourceFileRef.current.value = "";
     }
   };
@@ -519,7 +522,7 @@ export default function QuizEditor({
                 disabled={generating || extracting}
                 onClick={() => sourceFileRef.current?.click()}
               >
-                {extracting ? "Reading file…" : "⬆ Upload document (PDF / DOCX / TXT)"}
+                {extracting ? extractStatus ?? "Reading file…" : "⬆ Upload document (PDF / DOCX / TXT)"}
               </button>
               <input
                 ref={sourceFileRef}
