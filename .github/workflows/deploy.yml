@@ -56,6 +56,13 @@ jobs:
       - name: Run unit tests
         run: npm test
 
+      # firebase-tools@15's Firestore emulator requires a JDK >= 21 — newer
+      # than the runner's default Java.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
       # Rules tests need the Firestore emulator. `emulators:exec` starts it,
       # runs the suite, and tears it down. The demo- project prefix keeps the
       # emulator fully offline (no credentials touched).
