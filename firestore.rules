@@ -205,6 +205,24 @@ service cloud.firestore {
       allow read, write: if false; // admin SDK only
     }
 
+    // ── auditLogs/{id} ──────────────────────────────────────────────────────
+    // Admin action trail. Append-only: admins may create entries attributed
+    // to THEMSELVES; nothing can ever be updated or deleted from the client.
+    // Cloud Functions (bulkOnboard) append via the admin SDK.
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.action is string
+        && request.resource.data.action.size() > 0
+        && request.resource.data.action.size() <= 100
+        && request.resource.data.targetType is string
+        && request.resource.data.targetType.size() <= 50
+        && request.resource.data.details is string
+        && request.resource.data.details.size() <= 1000;
+      allow update, delete: if false; // append-only
+    }
+
     // ── mail/{id} ───────────────────────────────────────────────────────────
     // Written by Cloud Functions (admin SDK bypasses rules).
     // No client reads allowed — email content is sensitive.

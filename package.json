@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run tests/csvParser.test.ts tests/progress.test.ts tests/roleGuard.test.ts tests/resume.test.ts tests/search.test.ts tests/streaks.test.ts tests/quizSchema.test.ts tests/spacedRepetition.test.ts tests/labRubric.test.ts tests/paginate.test.ts tests/officeConvert.test.ts tests/courseOutlineSchema.test.ts",
+    "test": "vitest run tests/csvParser.test.ts tests/progress.test.ts tests/roleGuard.test.ts tests/resume.test.ts tests/search.test.ts tests/streaks.test.ts tests/quizSchema.test.ts tests/spacedRepetition.test.ts tests/labRubric.test.ts tests/paginate.test.ts tests/officeConvert.test.ts tests/courseOutlineSchema.test.ts tests/csvExport.test.ts",
     "test:rules": "vitest run tests/firestore.rules.test.ts"
   },
   "dependencies": {

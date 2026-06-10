@@ -18,6 +18,12 @@
  * "Import from DOCX" button: reads a .docx file → base64 → calls the
  * parseAssessmentDoc callable → replaces current question state with returned
  * questions. Admin reviews and saves normally.
+ *
+ * "✨ Generate questions" button: opens an inline panel that calls the
+ * generateAssessment callable (admin-only, drafts MCQs from the course/module
+ * lesson content) and prefills the question list. If the editor already has
+ * question content, an inline Replace/Append choice is shown first. Admin
+ * reviews and saves through the normal flow — nothing is auto-saved.
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -30,6 +36,8 @@ import type { Assessment, AssessmentKind, AssessmentQuestion } from "@/types";
 interface QuizEditorProps {
   courseId: string;
   kind: AssessmentKind;
+  /** Scopes AI generation to this module's lesson content when provided */
+  moduleId?: string;
   lessonId?: string;
   /** Existing assessment to prefill (edit mode); null = create mode */
   existing?: Assessment | null;
@@ -57,6 +65,42 @@ interface QuestionDraft {
   correctIndex: number;
 }
 
+interface GeneratedQuestion {
+  text: string;
+  options: string[];
+  correctIndex: number;
+  explanation?: string;
+}
+
+interface GenerateAssessmentRequest {
+  courseId: string;
+  moduleId?: string;
+  kind: AssessmentKind;
+  numQuestions: number;
+}
+
+interface GenerateAssessmentResponse {
+  questions: GeneratedQuestion[];
+}
+
+const GEN_MIN_QUESTIONS = 2;
+const GEN_MAX_QUESTIONS = 20;
+
+/** Extract the gRPC-style code from a callable error without using `any`. */
+function callableErrorMessage(err: unknown): string {
+  const code =
+    typeof err === "object" && err !== null && "code" in err && typeof (err as { code: unknown }).code === "string"
+      ? (err as { code: string }).code
+      : "";
+  if (code.endsWith("resource-exhausted")) {
+    return "Hourly AI generation limit reached — please try again later.";
+  }
+  if (code.endsWith("failed-precondition")) {
+    return "AI is not configured or there is not enough lesson content to generate from.";
+  }
+  return "Failed to generate questions. Please try again.";
+}
+
 function makeId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -78,6 +122,7 @@ function blankQuestion(): QuestionDraft {
 export default function QuizEditor({
   courseId,
   kind,
+  moduleId,
   lessonId,
   existing,
   onSaved,
@@ -105,6 +150,14 @@ export default function QuizEditor({
   const [importing, setImporting] = useState(false);
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
   const [showFormatGuide, setShowFormatGuide] = useState(false);
+
+  // Generate with AI
+  const [showGenPanel, setShowGenPanel] = useState(false);
+  const [genNumQuestions, setGenNumQuestions] = useState(5);
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  // Generated questions waiting on a Replace/Append decision
+  const [pendingGenerated, setPendingGenerated] = useState<QuestionDraft[] | null>(null);
 
   // In edit mode, fetch the answer key to prefill correctIndex values
   useEffect(() => {
@@ -230,6 +283,68 @@ export default function QuizEditor({
     }
   };
 
+  const generatedToDrafts = (generated: GeneratedQuestion[]): QuestionDraft[] =>
+    generated.map((g) => ({
+      id: makeId(),
+      prompt: g.text,
+      type: "mcq" as const,
+      options: g.options,
+      correctIndex: g.correctIndex,
+    }));
+
+  // True when the editor holds anything beyond the initial blank question
+  const hasQuestionContent = questions.some(
+    (q) => q.prompt.trim().length > 0 || q.options.some((o) => o.trim().length > 0)
+  );
+
+  const handleGenerate = async () => {
+    if (generating) return;
+    setGenerating(true);
+    setGenError(null);
+    setPendingGenerated(null);
+
+    try {
+      const num = Number.isFinite(genNumQuestions)
+        ? Math.min(GEN_MAX_QUESTIONS, Math.max(GEN_MIN_QUESTIONS, Math.round(genNumQuestions)))
+        : 5;
+      const generateFn = httpsCallable<GenerateAssessmentRequest, GenerateAssessmentResponse>(
+        functions,
+        "generateAssessment"
+      );
+      const result = await generateFn({
+        courseId,
+        ...(moduleId ? { moduleId } : {}),
+        kind,
+        numQuestions: num,
+      });
+      const drafts = generatedToDrafts(result.data.questions);
+      if (drafts.length === 0) {
+        setGenError("No questions were generated. Please try again.");
+        return;
+      }
+      if (hasQuestionContent) {
+        // Ask Replace / Append before touching existing work
+        setPendingGenerated(drafts);
+      } else {
+        setQuestions(drafts);
+        setShowGenPanel(false);
+      }
+    } catch (err: unknown) {
+      setGenError(callableErrorMessage(err));
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const applyGenerated = (mode: "replace" | "append") => {
+    if (!pendingGenerated) return;
+    setQuestions((prev) =>
+      mode === "replace" ? pendingGenerated : [...prev, ...pendingGenerated]
+    );
+    setPendingGenerated(null);
+    setShowGenPanel(false);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -334,7 +449,88 @@ export default function QuizEditor({
         >
           {showFormatGuide ? "Hide format guide" : "Format guide"}
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            setShowGenPanel((v) => !v);
+            setGenError(null);
+            setPendingGenerated(null);
+          }}
+          aria-expanded={showGenPanel}
+          className="btn-secondary text-xs flex items-center gap-1.5"
+        >
+          ✨ Generate questions
+        </button>
       </div>
+
+      {/* Generate with AI panel */}
+      {showGenPanel && (
+        <div className="rounded-lg p-3 text-xs space-y-2 border bg-brand-mint border-brand-line text-brand-ink">
+          <p className="font-semibold text-brand-primary">Generate questions with AI</p>
+          <p className="text-brand-muted">
+            Drafts multiple-choice questions from the{" "}
+            {moduleId ? "module's" : "course's"} lesson content. Review and edit
+            before saving.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="gen-num-questions" className="font-medium text-brand-muted">
+              Number of questions:
+            </label>
+            <input
+              id="gen-num-questions"
+              type="number"
+              min={GEN_MIN_QUESTIONS}
+              max={GEN_MAX_QUESTIONS}
+              className="input-field w-20 text-xs py-1"
+              value={genNumQuestions}
+              onChange={(e) => setGenNumQuestions(Number(e.target.value))}
+              disabled={generating}
+            />
+            <button
+              type="button"
+              onClick={() => void handleGenerate()}
+              disabled={generating}
+              className="btn-primary text-xs"
+            >
+              {generating ? "Generating…" : "Generate"}
+            </button>
+          </div>
+          {pendingGenerated && (
+            <div className="rounded-lg p-2 space-y-1.5 border border-brand-line bg-white">
+              <p className="font-medium text-brand-ink">
+                {pendingGenerated.length} question{pendingGenerated.length !== 1 ? "s" : ""} generated.
+                The editor already has questions — what should happen to them?
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => applyGenerated("replace")}
+                  className="btn-primary text-xs"
+                >
+                  Replace existing
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyGenerated("append")}
+                  className="btn-secondary text-xs"
+                >
+                  Append
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingGenerated(null)}
+                  className="text-xs underline text-brand-muted"
+                >
+                  Discard generated
+                </button>
+              </div>
+            </div>
+          )}
+          {genError && (
+            <p role="alert" className="text-red-600">{genError}</p>
+          )}
+        </div>
+      )}
 
       {showFormatGuide && (
         <div

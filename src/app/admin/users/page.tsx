@@ -17,6 +17,8 @@ import {
   arrayRemove,
 } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
+import { logAdminAction } from "@/lib/audit";
+import { useAuth } from "@/contexts/AuthContext";
 import type { AppUser, Cohort } from "@/types";
 import AdminShell from "@/components/layout/AdminShell";
 import { Spinner } from "@/components/ui/Spinner";
@@ -24,6 +26,7 @@ import { Badge } from "@/components/ui/Badge";
 
 export default function UsersPage() {
   const router = useRouter();
+  const { user: adminUser } = useAuth();
   const [users, setUsers] = useState<AppUser[]>([]);
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +73,22 @@ export default function UsersPage() {
       await updateDoc(doc(db, "users", u.uid), {
         cohortIds: has ? arrayRemove(cohortId) : arrayUnion(cohortId),
       });
+      // Best-effort audit trail — never blocks or fails the UI
+      if (adminUser) {
+        const cohortName =
+          cohorts.find((c) => c.id === cohortId)?.name ?? cohortId;
+        void logAdminAction(
+          { uid: adminUser.uid, email: adminUser.email },
+          {
+            action: "user.update",
+            targetType: "user",
+            targetId: u.uid,
+            details: has
+              ? `Removed ${u.email} from cohort "${cohortName}"`
+              : `Added ${u.email} to cohort "${cohortName}"`,
+          }
+        );
+      }
       setUsers((prev) =>
         prev.map((x) =>
           x.uid === u.uid

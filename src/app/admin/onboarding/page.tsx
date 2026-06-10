@@ -10,12 +10,19 @@ import { useState, useRef } from "react";
 import { httpsCallable } from "firebase/functions";
 import functions from "@/lib/firebase/functions";
 import { parseOnboardingFile, TEMPLATE_CSV } from "@/lib/csvParser";
+import { logAdminAction } from "@/lib/audit";
+import { useAuth } from "@/contexts/AuthContext";
 import type { OnboardingResult } from "@/types";
 import AdminShell from "@/components/layout/AdminShell";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
 
+// The Cloud Function returns a per-row `status`; the legacy client type only
+// declares `success`. Accept both shapes when summarizing for the audit log.
+type RowOutcome = OnboardingResult & { status?: "created" | "skipped" | "error" };
+
 export default function OnboardingPage() {
+  const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [parseErrors, setParseErrors] = useState<Array<{ row: number; message: string }>>([]);
@@ -51,6 +58,29 @@ export default function OnboardingPage() {
       );
       const res = await fn({ rows: valid });
       setResults(res.data.results);
+
+      // Best-effort audit trail — never blocks or fails the UI
+      if (user) {
+        const outcomes = res.data.results as RowOutcome[];
+        const created = outcomes.filter(
+          (r) => r.status === "created" || (r.status === undefined && r.success)
+        ).length;
+        const skipped = outcomes.filter((r) => r.status === "skipped").length;
+        const errored = outcomes.filter(
+          (r) => r.status === "error" || (r.status === undefined && !r.success)
+        ).length;
+        void logAdminAction(
+          { uid: user.uid, email: user.email },
+          {
+            // "upload" (client, includes the filename) complements the
+            // server-written "onboarding.run" entry from bulkOnboard.
+            action: "onboarding.upload",
+            targetType: "onboarding",
+            targetId: "",
+            details: `Onboarded ${valid.length} row(s) from "${file.name}" (${created} created, ${skipped} skipped, ${errored} error(s))`,
+          }
+        );
+      }
     } catch (err: unknown) {
       setCallError(err instanceof Error ? err.message : "Function call failed");
     } finally {

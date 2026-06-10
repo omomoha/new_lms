@@ -874,6 +874,7 @@ export default function CourseBuilderPage() {
                           <QuizEditor
                             courseId={courseId}
                             kind="quiz"
+                            moduleId={mod.id}
                             lessonId={lesson.id}
                             existing={quizAssessments[lesson.id] ?? undefined}
                             onSaved={(a) => {

@@ -1,7 +1,7 @@
 /**
  * generateAssessment — Callable Cloud Function (admin-only)
  *
- * Drafts a pre/post assessment from course/module lesson content for review
+ * Drafts a pre/post/quiz assessment from course/module lesson content for review
  * in the existing QuizEditor. NOTHING is written to Firestore — the admin
  * reviews, edits, and saves through the normal editor flow.
  *
@@ -48,7 +48,7 @@ const SYSTEM_PROMPT =
 interface GenerateAssessmentRequest {
   courseId: string;
   moduleId?: string;
-  kind: "pre" | "post";
+  kind: "pre" | "post" | "quiz";
   numQuestions: number;
 }
 
@@ -70,8 +70,8 @@ export const generateAssessment = onCall<GenerateAssessmentRequest>(
     if (moduleId !== undefined && (typeof moduleId !== "string" || !ID_RE.test(moduleId))) {
       throw new HttpsError("invalid-argument", "Invalid moduleId.");
     }
-    if (kind !== "pre" && kind !== "post") {
-      throw new HttpsError("invalid-argument", 'kind must be "pre" or "post".');
+    if (kind !== "pre" && kind !== "post" && kind !== "quiz") {
+      throw new HttpsError("invalid-argument", 'kind must be "pre", "post" or "quiz".');
     }
     const rawNum = request.data.numQuestions;
     if (typeof rawNum !== "number" || !Number.isFinite(rawNum)) {
@@ -98,7 +98,9 @@ export const generateAssessment = onCall<GenerateAssessmentRequest>(
     const kindDescription =
       kind === "pre"
         ? "PRE-COURSE baseline assessment (checks prior knowledge of the topics the course will cover)"
-        : "POST-COURSE mastery assessment (verifies the learner understood and can apply the material)";
+        : kind === "post"
+        ? "POST-COURSE mastery assessment (verifies the learner understood and can apply the material)"
+        : "LESSON QUIZ (checks understanding of the specific lesson/module material just covered)";
 
     const userMessage = [
       fenceUntrusted("course_material", content, MAX_CONTENT_CHARS),

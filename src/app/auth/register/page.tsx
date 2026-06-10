@@ -26,8 +26,8 @@ export default function RegisterPage() {
       setError("Please enter a valid email address.");
       return;
     }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
       return;
     }
     setLoading(true);
@@ -81,7 +81,7 @@ export default function RegisterPage() {
           <div>
             <label htmlFor="password" className="block text-sm font-medium mb-1 text-brand-ink">Password</label>
             <input id="password" type="password" autoComplete="new-password" required value={password}
-              onChange={(e) => setPassword(e.target.value)} className="input-field" placeholder="At least 6 characters" />
+              onChange={(e) => setPassword(e.target.value)} className="input-field" placeholder="At least 8 characters" />
           </div>
           <button type="submit" disabled={loading} className="btn-primary w-full py-2.5 mt-2">
             {loading ? "Creating account…" : "Create account"}

@@ -21,6 +21,8 @@ import type { AppUser, Cohort, Course, Assessment, Attempt } from "@/types";
 import AdminShell from "@/components/layout/AdminShell";
 import { Spinner } from "@/components/ui/Spinner";
 import { PairedBarChart, DeltaBadge } from "@/components/ui/PairedBarChart";
+import DownloadCsvButton from "@/components/admin/DownloadCsvButton";
+import type { CsvField } from "@/lib/csvExport";
 
 interface Row {
   uid: string;
@@ -37,6 +39,25 @@ interface Row {
 
 const fmtDur = (s: number) =>
   s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${Math.round(s)}s`;
+
+/** Column order for the insights CSV export. */
+const INSIGHTS_CSV_HEADERS = [
+  "learner",
+  "course",
+  "cohorts",
+  "pre_pct",
+  "post_pct",
+  "improvement_points",
+  "pre_duration_sec",
+  "post_duration_sec",
+];
+
+/** Filename-safe slug for the export scope (cohort / learner name). */
+const slugify = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "scope";
 
 export default function AssessmentInsightsPage() {
   const [loading, setLoading] = useState(true);
@@ -196,6 +217,44 @@ export default function AssessmentInsightsPage() {
     })).filter((d) => d.a != null || d.b != null);
   }, [visibleRows]);
 
+  // ── CSV export (respects active cohort + learner filters) ─────────────────
+  const csvRows = useMemo<CsvField[][]>(() => {
+    const cohortNameById = new Map(cohorts.map((c) => [c.id, c.name]));
+    return visibleRows
+      .slice()
+      .sort((a, b) => (b.delta ?? -999) - (a.delta ?? -999)) // mirror the table
+      .map((r) => [
+        r.name,
+        r.courseTitle,
+        r.cohortIds
+          .map((id) => cohortNameById.get(id))
+          .filter((n): n is string => n !== undefined)
+          .join("; "),
+        r.prePct != null ? Math.round(r.prePct) : null,
+        r.postPct != null ? Math.round(r.postPct) : null,
+        r.delta != null ? Math.round(r.delta) : null,
+        r.preDur != null ? Math.round(r.preDur) : null,
+        r.postDur != null ? Math.round(r.postDur) : null,
+      ]);
+  }, [visibleRows, cohorts]);
+
+  const csvFilename = useMemo(() => {
+    const scope =
+      learnerFilter !== "all"
+        ? slugify(
+            learnersInCohort.find((l) => l.uid === learnerFilter)?.name ??
+              "learner"
+          )
+        : cohortFilter !== "all"
+          ? slugify(
+              cohorts.find((c) => c.id === cohortFilter)?.tag ||
+                cohorts.find((c) => c.id === cohortFilter)?.name ||
+                "cohort"
+            )
+          : "all";
+    return `insights-${scope}-${new Date().toISOString().slice(0, 10)}.csv`;
+  }, [learnerFilter, cohortFilter, learnersInCohort, cohorts]);
+
   if (loading) {
     return (
       <AdminShell>
@@ -251,6 +310,14 @@ export default function AssessmentInsightsPage() {
             ))}
           </select>
         </label>
+        <DownloadCsvButton
+          filename={csvFilename}
+          headers={INSIGHTS_CSV_HEADERS}
+          rows={csvRows}
+          loading={loading}
+          emptyReason="No assessment results for this selection — nothing to export."
+          className="!py-2 self-start sm:self-auto"
+        />
       </div>
 
       {visibleRows.length === 0 ? (

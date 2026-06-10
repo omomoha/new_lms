@@ -29,6 +29,8 @@ import {
 } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
 import { uploadResource } from "@/lib/files";
+import { logAdminAction } from "@/lib/audit";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Cohort, AppUser, Course, Enrollment } from "@/types";
 import AdminShell from "@/components/layout/AdminShell";
 import { Spinner } from "@/components/ui/Spinner";
@@ -58,7 +60,17 @@ interface MemberAnalytic {
 export default function CohortDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { user: adminUser } = useAuth();
   const cohortId = params.cohortId as string;
+
+  // Best-effort audit trail — never blocks or fails the UI
+  const audit = (action: string, details: string) => {
+    if (!adminUser) return;
+    void logAdminAction(
+      { uid: adminUser.uid, email: adminUser.email },
+      { action, targetType: "cohort", targetId: cohortId, details }
+    );
+  };
 
   const [cohort, setCohort] = useState<Cohort | null>(null);
   const [users, setUsers] = useState<AppUser[]>([]);
@@ -200,6 +212,10 @@ export default function CohortDetailPage() {
         color: editColor,
       };
       await updateDoc(doc(db, "cohorts", cohortId), updated);
+      audit(
+        "cohort.update",
+        `Updated cohort "${cohort.name}" → name "${updated.name}", tag "${updated.tag}", color ${updated.color}`
+      );
       setCohort((prev) => (prev ? { ...prev, ...updated } : prev));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to rename cohort");
@@ -217,6 +233,21 @@ export default function CohortDetailPage() {
       await updateDoc(doc(db, "users", u.uid), {
         cohortIds: has ? arrayRemove(cohortId) : arrayUnion(cohortId),
       });
+      // Best-effort audit trail — target is the mutated users/{uid} doc
+      if (adminUser) {
+        const cohortName = cohort?.name ?? cohortId;
+        void logAdminAction(
+          { uid: adminUser.uid, email: adminUser.email },
+          {
+            action: has ? "cohort.member.remove" : "cohort.member.add",
+            targetType: "user",
+            targetId: u.uid,
+            details: has
+              ? `Removed ${u.email} from cohort "${cohortName}"`
+              : `Added ${u.email} to cohort "${cohortName}"`,
+          }
+        );
+      }
       setUsers((prev) =>
         prev.map((x) =>
           x.uid === u.uid
@@ -251,6 +282,12 @@ export default function CohortDetailPage() {
       await updateDoc(doc(db, "cohorts", cohortId), {
         courseIds: has ? arrayRemove(course.id) : arrayUnion(course.id),
       });
+      audit(
+        has ? "cohort.course.unassign" : "cohort.course.assign",
+        has
+          ? `Revoked course "${course.title}" from cohort "${cohort.name}"`
+          : `Granted course "${course.title}" to cohort "${cohort.name}"`
+      );
       setCohort((prev) =>
         prev
           ? {
@@ -305,6 +342,11 @@ export default function CohortDetailPage() {
       // Delete the cohort doc itself
       await deleteDoc(doc(db, "cohorts", cohortId));
 
+      audit(
+        "cohort.delete",
+        `Deleted cohort "${cohort.name}" (tag: ${cohort.tag}) — detached ${memberUsers.length} member(s) and ${assignedCourses.length} course(s)`
+      );
+
       router.push("/admin/cohorts");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to delete cohort");
@@ -325,6 +367,10 @@ export default function CohortDetailPage() {
       const path = `thumbnails/cohorts/${cohortId}_${Date.now()}.${ext}`;
       const storedPath = await uploadResource(file, path);
       await updateDoc(doc(db, "cohorts", cohortId), { thumbPath: storedPath });
+      audit(
+        "cohort.update",
+        `Updated thumbnail for cohort "${cohort?.name ?? cohortId}"`
+      );
       setCohort((prev) => prev ? { ...prev, thumbPath: storedPath } : prev);
     } catch (err: unknown) {
       setThumbError(err instanceof Error ? err.message : "Upload failed");

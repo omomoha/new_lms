@@ -276,6 +276,32 @@ export const bulkOnboard = onCall(
       }
     }
 
+    // Audit log: ONE summary entry per run, written with the admin SDK
+    // (bypasses rules — auditLogs is append-only for clients).
+    // Best-effort: a logging failure must never fail the onboarding run.
+    try {
+      const created = results.filter((r) => r.status === "created").length;
+      const skipped = results.filter((r) => r.status === "skipped").length;
+      const errored = results.filter((r) => r.status === "error").length;
+      await db.collection("auditLogs").add({
+        actorUid: request.auth?.uid ?? "",
+        actorEmail:
+          typeof request.auth?.token?.email === "string"
+            ? request.auth.token.email
+            : "",
+        action: "onboarding.run",
+        targetType: "onboarding",
+        targetId: "",
+        details: `Bulk onboarding processed ${rows.length} row(s): ${created} created, ${skipped} skipped, ${errored} error(s)`.slice(
+          0,
+          1000
+        ),
+        at: FieldValue.serverTimestamp(),
+      });
+    } catch (auditErr: unknown) {
+      console.warn("bulkOnboard: failed to write auditLogs entry:", auditErr);
+    }
+
     return { results };
   }
 );

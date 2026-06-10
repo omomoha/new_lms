@@ -22,6 +22,8 @@ import AdminShell from "@/components/layout/AdminShell";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
+import DownloadCsvButton from "@/components/admin/DownloadCsvButton";
+import type { CsvField } from "@/lib/csvExport";
 
 // ─── Per-user aggregated row ──────────────────────────────────────────────────
 
@@ -56,10 +58,20 @@ function formatDateMs(ms: number | null): string {
   });
 }
 
-function escapeCSV(value: string): string {
-  if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
-}
+/** Column order for the roster CSV export. */
+const ROSTER_CSV_HEADERS = [
+  "name",
+  "email",
+  "role",
+  "cohorts",
+  "avg_progress_pct",
+  "courses_completed",
+  "courses_enrolled",
+  "attempts",
+  "attempts_passed",
+  "best_post_pct",
+  "last_activity",
+];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -225,48 +237,29 @@ export default function RosterPage() {
   }, [rows, search, cohortFilter]);
 
   // ── CSV Export ──────────────────────────────────────────────────────────────
-  const handleExportCSV = useCallback(() => {
-    const header = [
-      "name",
-      "email",
-      "role",
-      "cohorts",
-      "avg_progress",
-      "courses_completed",
-      "courses_enrolled",
-      "attempts",
-      "passed",
-      "best_post_pct",
-      "last_activity",
-    ].join(",");
-
-    const rowLines = filtered.map((r) => {
-      const cohortNames = r.cohorts.map((c) => c.name).join("; ");
-      const lastActivity = formatDateMs(r.lastActivityMs);
-      return [
-        escapeCSV(r.name),
-        escapeCSV(r.email),
-        escapeCSV(r.role),
-        escapeCSV(cohortNames),
-        r.avgProgress.toString(),
-        r.completedCount.toString(),
-        r.enrolledCount.toString(),
-        r.totalAttempts.toString(),
-        r.passedAttempts.toString(),
-        r.bestPostPct !== null ? r.bestPostPct.toString() : "",
-        escapeCSV(lastActivity),
-      ].join(",");
-    });
-
-    const csv = [header, ...rowLines].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "roster.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-  }, [filtered]);
+  // Rows mirror ROSTER_CSV_HEADERS; built from the filtered view so the export
+  // respects the active search/cohort filter. Quoting + injection-guarding is
+  // handled centrally by src/lib/csvExport.ts.
+  const csvRows = useMemo<CsvField[][]>(
+    () =>
+      filtered.map((r) => [
+        r.name,
+        r.email,
+        r.role,
+        r.cohorts.map((c) => c.name).join("; "),
+        r.avgProgress,
+        r.completedCount,
+        r.enrolledCount,
+        r.totalAttempts,
+        r.passedAttempts,
+        r.bestPostPct,
+        r.lastActivityMs !== null
+          ? new Date(r.lastActivityMs).toISOString().slice(0, 10)
+          : null,
+      ]),
+    [filtered]
+  );
+  const csvFilename = `roster-${new Date().toISOString().slice(0, 10)}.csv`;
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -304,6 +297,14 @@ export default function RosterPage() {
               </option>
             ))}
           </select>
+          <DownloadCsvButton
+            filename={csvFilename}
+            headers={ROSTER_CSV_HEADERS}
+            rows={csvRows}
+            loading={loading}
+            emptyReason="No learners match the current filter — nothing to export."
+            className="!py-2"
+          />
         </div>
       </div>
 
@@ -512,13 +513,6 @@ export default function RosterPage() {
                   ? `${rows.length} learner${rows.length !== 1 ? "s" : ""}`
                   : `${filtered.length} of ${rows.length} learners`}
               </span>
-              <button
-                onClick={handleExportCSV}
-                className="btn-secondary text-xs flex items-center gap-1.5"
-                title="Download roster as CSV"
-              >
-                <span aria-hidden="true">⬇</span> Export CSV
-              </button>
             </div>
           </div>
         </>

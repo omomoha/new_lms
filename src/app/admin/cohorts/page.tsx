@@ -18,6 +18,8 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
+import { logAdminAction } from "@/lib/audit";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Cohort, AppUser } from "@/types";
 import AdminShell from "@/components/layout/AdminShell";
 import { Spinner } from "@/components/ui/Spinner";
@@ -27,6 +29,7 @@ const COLORS = ["#2C7A6B", "#7FB069", "#13403A", "#C9772F", "#5E6E69"];
 
 export default function CohortsPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -69,14 +72,28 @@ export default function CohortsPage() {
     setSaving(true);
     setError(null);
     try {
+      const cohortName = name.trim();
+      const cohortTag = tag.trim().toLowerCase().replace(/\s+/g, "-");
       const ref = await addDoc(collection(db, "cohorts"), {
-        name: name.trim(),
-        tag: tag.trim().toLowerCase().replace(/\s+/g, "-"),
+        name: cohortName,
+        tag: cohortTag,
         color,
         courseIds: [],
         createdAt: serverTimestamp(),
       });
       await updateDoc(doc(db, "cohorts", ref.id), { id: ref.id });
+      // Best-effort audit trail — never blocks or fails the UI
+      if (user) {
+        void logAdminAction(
+          { uid: user.uid, email: user.email },
+          {
+            action: "cohort.create",
+            targetType: "cohort",
+            targetId: ref.id,
+            details: `Created cohort "${cohortName}" (tag: ${cohortTag})`,
+          }
+        );
+      }
       setName("");
       setTag("");
       setAdding(false);

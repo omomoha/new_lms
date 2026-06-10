@@ -13,6 +13,8 @@ import {
   orderBy,
 } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
+import { logAdminAction } from "@/lib/audit";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Course } from "@/types";
 import AdminShell from "@/components/layout/AdminShell";
 import { Spinner } from "@/components/ui/Spinner";
@@ -26,6 +28,7 @@ const STATUS_VARIANT: Record<string, "default" | "success" | "warning" | "error"
 };
 
 export default function AdminCoursesPage() {
+  const { user } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -63,6 +66,18 @@ export default function AdminCoursesPage() {
       });
       // Update with generated id
       await updateDoc(doc(db, "courses", ref.id), { id: ref.id });
+      // Best-effort audit trail — never blocks or fails the UI
+      if (user) {
+        void logAdminAction(
+          { uid: user.uid, email: user.email },
+          {
+            action: "course.create",
+            targetType: "course",
+            targetId: ref.id,
+            details: `Created course "${title.trim()}" (draft)`,
+          }
+        );
+      }
       setTitle(""); setDescription(""); setShowForm(false);
       fetchCourses();
     } catch (err: unknown) {
