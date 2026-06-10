@@ -623,33 +623,46 @@ export default function CourseBuilderPage() {
         <p className="text-xs mb-2 text-brand-muted">
           Who can access this course once it is <b>published</b>.
         </p>
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 mb-4" role="radiogroup" aria-label="Course availability">
-          <label className="flex items-start gap-2 text-sm cursor-pointer">
-            <input
-              type="radio"
-              name="availability"
-              className="mt-0.5"
-              checked={(course?.availability ?? "cohorts") === "cohorts"}
-              onChange={() => void setAvailability("cohorts")}
-            />
-            <span>
-              <span className="font-medium text-brand-ink">Assigned cohorts only</span>
-              <span className="block text-xs text-brand-muted">Default — learners need a cohort assignment below.</span>
-            </span>
-          </label>
-          <label className="flex items-start gap-2 text-sm cursor-pointer">
-            <input
-              type="radio"
-              name="availability"
-              className="mt-0.5"
-              checked={course?.availability === "all"}
-              onChange={() => void setAvailability("all")}
-            />
-            <span>
-              <span className="font-medium text-brand-ink">All users</span>
-              <span className="block text-xs text-brand-muted">Every signed-in learner can take this course.</span>
-            </span>
-          </label>
+        <div className="grid sm:grid-cols-2 gap-2 mb-4" role="radiogroup" aria-label="Course availability">
+          {([
+            {
+              value: "cohorts" as const,
+              title: "Assigned cohorts only",
+              hint: "Default — learners need a cohort assignment below.",
+            },
+            {
+              value: "all" as const,
+              title: "All users",
+              hint: "Every signed-in learner can take this course.",
+            },
+          ]).map((opt) => {
+            const selected = (course?.availability ?? "cohorts") === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => void setAvailability(opt.value)}
+                className={`text-left rounded-lg border px-4 py-3 transition-colors ${
+                  selected
+                    ? "bg-brand-mint border-brand-teal"
+                    : "bg-white border-brand-line hover:border-brand-teal"
+                }`}
+              >
+                <span className="flex items-center gap-2 font-medium text-sm text-brand-ink">
+                  <span
+                    aria-hidden="true"
+                    className={`inline-block w-3.5 h-3.5 rounded-full border-2 ${
+                      selected ? "border-brand-teal bg-brand-teal" : "border-brand-line bg-white"
+                    }`}
+                  />
+                  {opt.title}
+                </span>
+                <span className="block text-xs text-brand-muted mt-0.5 pl-5.5 sm:pl-0">{opt.hint}</span>
+              </button>
+            );
+          })}
         </div>
         <h2 className="font-medium mb-1 text-brand-ink">Cohort access</h2>
         <p className="text-xs mb-3 text-brand-muted">

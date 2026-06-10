@@ -29,6 +29,7 @@ export { generateFlashcards } from "./flashcardsGen";
 export { adminCopilot } from "./adminCopilot";
 
 export { getCohortLeaderboard } from "./leaderboard";
+export { manageUserAccount } from "./manageUsers";
 
 // ── Retention ────────────────────────────────────────────────────────────────
 export { learnerReminders } from "./learnerReminders";

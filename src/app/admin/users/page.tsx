@@ -7,6 +7,8 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import { httpsCallable } from "firebase/functions";
+import functions from "@/lib/firebase/functions";
 import { useRouter } from "next/navigation";
 import {
   collection,
@@ -31,6 +33,7 @@ export default function UsersPage() {
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyUid, setBusyUid] = useState<string | null>(null);
+  const [confirmDeleteUid, setConfirmDeleteUid] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
@@ -115,6 +118,37 @@ export default function UsersPage() {
       u.email?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const { user: me } = useAuth();
+
+  const manageAccount = async (u: AppUser, action: "pause" | "activate" | "delete") => {
+    setBusyUid(u.uid);
+    setError(null);
+    try {
+      const fn = httpsCallable<{ uid: string; action: string }, { ok: boolean }>(
+        functions,
+        "manageUserAccount"
+      );
+      await fn({ uid: u.uid, action });
+      setConfirmDeleteUid(null);
+      if (action === "delete") {
+        setUsers((prev) => prev.filter((x) => x.uid !== u.uid));
+      } else {
+        setUsers((prev) =>
+          prev.map((x) =>
+            x.uid === u.uid
+              ? { ...x, status: action === "pause" ? "inactive" : "active" }
+              : x
+          )
+        );
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Action failed";
+      setError(msg);
+    } finally {
+      setBusyUid(null);
+    }
+  };
+
   return (
     <AdminShell>
       {/* Page hero band */}
@@ -167,6 +201,9 @@ export default function UsersPage() {
                     label={u.role}
                     variant={u.role === "admin" ? "success" : "default"}
                   />
+                  {u.status === "inactive" && (
+                    <Badge label="paused" variant="warning" />
+                  )}
                 </div>
                 <p className="text-xs truncate text-brand-muted">{u.email}</p>
               </div>
@@ -199,6 +236,57 @@ export default function UsersPage() {
                   })
                 )}
               </div>
+              {/* Account actions: pause/activate + delete (self/admin-immune
+                  server-side; hide for your own row and other admins) */}
+              {u.uid !== me?.uid && u.role !== "admin" && (
+                <div className="flex gap-1.5 flex-shrink-0">
+                  <button
+                    disabled={busyUid === u.uid}
+                    onClick={() =>
+                      void manageAccount(u, u.status === "inactive" ? "activate" : "pause")
+                    }
+                    className="btn-secondary text-xs"
+                    title={
+                      u.status === "inactive"
+                        ? "Re-enable sign-in for this account"
+                        : "Disable sign-in and end this account's sessions"
+                    }
+                  >
+                    {busyUid === u.uid
+                      ? "…"
+                      : u.status === "inactive"
+                      ? "Activate"
+                      : "Pause"}
+                  </button>
+                  {confirmDeleteUid === u.uid ? (
+                    <>
+                      <button
+                        disabled={busyUid === u.uid}
+                        onClick={() => void manageAccount(u, "delete")}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-700 text-white hover:bg-red-800 transition-colors"
+                      >
+                        Confirm delete
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteUid(null)}
+                        className="btn-secondary text-xs"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      disabled={busyUid === u.uid}
+                      onClick={() => setConfirmDeleteUid(u.uid)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium border border-red-200 text-red-700 hover:bg-red-50 transition-colors"
+                      title="Delete this account (learning records are kept)"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* View learner analytics */}
               <button
                 onClick={() => router.push(`/admin/users/${u.uid}`)}

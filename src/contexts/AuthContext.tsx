@@ -93,6 +93,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const snap = await getDoc(doc(db, "users", firebaseUser.uid));
           if (snap.exists()) {
             const docData = snap.data() as AppUser;
+            // Paused accounts: Auth sign-in is already disabled server-side,
+            // but a session minted before the pause could live up to an hour
+            // — force it out as soon as the status is visible.
+            if (docData.status === "inactive") {
+              await firebaseSignOut(getClientAuth());
+              setAppUser(null);
+              return;
+            }
             setAppUser({
               ...docData,
               // Claim role wins; fall back to Firestore doc role if claim absent
