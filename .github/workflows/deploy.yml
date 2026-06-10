@@ -115,6 +115,30 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           AI_MODEL: ${{ secrets.AI_MODEL }}
 
+      # LibreOffice (PPTX→PDF conversion) is bundled as an Amazon Linux build;
+      # Google's functions runtime image lacks the X11/session libraries it
+      # links against (smoke test: "libSM.so.6: cannot open shared object
+      # file"). Vendor those .so files (plus fontconfig/freetype + DejaVu
+      # fonts for text rendering) into functions/vendor-libs at deploy time —
+      # convertOfficeToPdf adds the dir to LD_LIBRARY_PATH when spawning
+      # soffice. Debs are amd64 (the functions runtime arch).
+      - name: Vendor LibreOffice runtime libraries
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/lo-debs functions/vendor-libs/fonts
+          cd /tmp/lo-debs
+          for pkg in libsm6 libice6 libxext6 libxinerama1 libxrender1 \
+                     libx11-6 libxau6 libxdmcp6 libxcb1 libbsd0 libmd0 \
+                     libfontconfig1 libfreetype6 libpng16-16 libexpat1 \
+                     libbrotli1 libuuid1 fonts-dejavu-core; do
+            apt-get download "$pkg:amd64" || apt-get download "$pkg"
+          done
+          for deb in *.deb; do dpkg-deb -x "$deb" extract/; done
+          cp -av extract/usr/lib/x86_64-linux-gnu/*.so* "$GITHUB_WORKSPACE/functions/vendor-libs/" 2>/dev/null || true
+          cp -av extract/lib/x86_64-linux-gnu/*.so* "$GITHUB_WORKSPACE/functions/vendor-libs/" 2>/dev/null || true
+          find extract -name "*.ttf" -exec cp -v {} "$GITHUB_WORKSPACE/functions/vendor-libs/fonts/" \;
+          ls -la "$GITHUB_WORKSPACE/functions/vendor-libs" | head -30
+
       - name: Enable Next.js web-frameworks support
         run: npx firebase-tools@15 experiments:enable webframeworks
 

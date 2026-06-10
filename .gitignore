@@ -46,3 +46,4 @@ functions/node_modules/
 *-service-account*.json
 firebase-adminsdk*.json
 serviceAccountKey.json
+functions/vendor-libs/

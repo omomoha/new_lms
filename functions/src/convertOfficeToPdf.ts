@@ -26,7 +26,7 @@ import { onObjectFinalized } from "firebase-functions/v2/storage";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import { spawn } from "node:child_process";
-import { createReadStream, existsSync, mkdirSync, chmodSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, chmodSync, writeFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { createBrotliDecompress } from "node:zlib";
 import * as path from "node:path";
@@ -38,6 +38,46 @@ if (!admin.apps.length) admin.initializeApp();
 const SOFFICE = "/tmp/instdir/program/soffice";
 const MAX_SOURCE_BYTES = 100 * 1024 * 1024; // 100 MB
 const CONVERT_TIMEOUT_MS = 6 * 60 * 1000;
+
+/**
+ * X11/session/fontconfig shared libraries the Amazon-Linux LibreOffice build
+ * links against but Google's runtime image lacks (production smoke test:
+ * "libSM.so.6: cannot open shared object file"). CI vendors them into
+ * functions/vendor-libs at deploy time; compiled code runs from /workspace/lib
+ * so the vendored dir sits one level up from __dirname.
+ */
+const VENDOR_LIBS = path.resolve(__dirname, "..", "vendor-libs");
+const VENDOR_FONTS = path.join(VENDOR_LIBS, "fonts");
+const FONTCONFIG_FILE = "/tmp/lo-fonts.conf";
+
+/** Env for soffice: vendored libs on the loader path + minimal font config. */
+function sofficeEnv(): NodeJS.ProcessEnv {
+  const ldParts = [VENDOR_LIBS, "/tmp/instdir/program"];
+  if (process.env.LD_LIBRARY_PATH) ldParts.push(process.env.LD_LIBRARY_PATH);
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    HOME: "/tmp",
+    LD_LIBRARY_PATH: ldParts.join(":"),
+  };
+  if (!existsSync(VENDOR_LIBS)) {
+    console.warn(
+      "convertOfficeToPdf: vendor-libs missing — deploy via CI (which vendors " +
+      "the X11/fontconfig libraries) or conversions may fail with exit 127."
+    );
+  }
+  if (existsSync(VENDOR_FONTS)) {
+    if (!existsSync(FONTCONFIG_FILE)) {
+      writeFileSync(
+        FONTCONFIG_FILE,
+        `<?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "fonts.dtd">` +
+        `<fontconfig><dir>${VENDOR_FONTS}</dir>` +
+        `<cachedir>/tmp/fontconfig-cache</cachedir></fontconfig>`
+      );
+    }
+    env.FONTCONFIG_FILE = FONTCONFIG_FILE;
+  }
+  return env;
+}
 
 /** Decompress + untar the bundled LibreOffice into /tmp (cold start only). */
 async function ensureSoffice(): Promise<string> {
@@ -69,10 +109,7 @@ function runSoffice(soffice: string, inputFile: string, outDir: string): Promise
         inputFile,
       ],
       {
-        env: {
-          ...process.env,
-          HOME: "/tmp",
-        },
+        env: sofficeEnv(),
         timeout: CONVERT_TIMEOUT_MS,
       }
     );
