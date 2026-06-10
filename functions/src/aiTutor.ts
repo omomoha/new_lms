@@ -150,8 +150,10 @@ export const askTutor = onCall<AskTutorRequest>(
           content?: string;
           textContent?: string;
           transcript?: string;
+          /** Text extracted from uploaded PDF/DOCX/deck files (conversion pipeline) */
+          extractedText?: string;
         };
-        const body = [d.content, d.textContent, d.transcript]
+        const body = [d.content, d.textContent, d.transcript, d.extractedText]
           .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
           .join("\n\n");
         context = `# ${d.title ?? "Lesson"}\n${body}`;

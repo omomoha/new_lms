@@ -31,9 +31,17 @@ import { rm } from "node:fs/promises";
 import { createBrotliDecompress } from "node:zlib";
 import * as path from "node:path";
 import * as tarFs from "tar-fs";
-import { shouldAutoConvert, convertedPathFor, sofficeOutputName } from "./officeConvert";
+import { readFile } from "node:fs/promises";
+import {
+  shouldAutoConvert,
+  convertedPathFor,
+  sofficeOutputName,
+  extractionKind,
+} from "./officeConvert";
 
 if (!admin.apps.length) admin.initializeApp();
+
+const db = admin.firestore();
 
 const SOFFICE = "/tmp/instdir/program/soffice";
 const MAX_SOURCE_BYTES = 100 * 1024 * 1024; // 100 MB
@@ -171,9 +179,80 @@ async function convertOne(bucket: Bucket, name: string): Promise<void> {
       },
     });
     console.log(`convertOfficeToPdf: ${name} → ${targetPath}`);
+
+    // Make the deck's text visible to the AI tutor (smoke-test finding: the
+    // tutor was blind on file-based lessons). Extraction failures must never
+    // fail the conversion.
+    try {
+      const pdfBytes = await readFile(produced);
+      const text = await pdfBufferToText(pdfBytes);
+      await storeExtractedText(name, text);
+    } catch (err) {
+      console.warn(`convertOfficeToPdf: text extraction failed for ${name}:`, err);
+    }
   } finally {
     await rm(workDir, { recursive: true, force: true }).catch(() => undefined);
   }
+}
+
+// ─── Lesson text extraction (feeds the AI tutor) ────────────────────────────
+
+const MAX_EXTRACTED_CHARS = 60000;
+const MIN_EXTRACTED_CHARS = 40;
+
+/** PDF bytes → plain text via pdf-parse. */
+async function pdfBufferToText(buf: Buffer): Promise<string> {
+  // pdf-parse is CJS; default export is the parse function
+  const pdfParse = (await import("pdf-parse")).default;
+  const result = await pdfParse(buf);
+  return result.text ?? "";
+}
+
+/** DOCX bytes → plain text via mammoth (already a functions dependency). */
+async function docxBufferToText(buf: Buffer): Promise<string> {
+  const mammoth = await import("mammoth");
+  const result = await mammoth.extractRawText({ buffer: buf });
+  return result.value ?? "";
+}
+
+/**
+ * Store extracted text on every lesson whose filePath matches the uploaded
+ * object (collection-group query — index on lessons.filePath). The dedicated
+ * extractedText field never collides with rendered textContent.
+ */
+async function storeExtractedText(objectName: string, rawText: string): Promise<void> {
+  const text = rawText.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim()
+    .slice(0, MAX_EXTRACTED_CHARS);
+  if (text.length < MIN_EXTRACTED_CHARS) {
+    console.log(`extractText: ${objectName} produced <${MIN_EXTRACTED_CHARS} chars — skipping.`);
+    return;
+  }
+  const lessons = await db
+    .collectionGroup("lessons")
+    .where("filePath", "==", objectName)
+    .get();
+  if (lessons.empty) {
+    console.log(`extractText: no lesson references ${objectName} (yet).`);
+    return;
+  }
+  await Promise.all(
+    lessons.docs.map((d) =>
+      d.ref.update({
+        extractedText: text,
+        extractedAt: admin.firestore.FieldValue.serverTimestamp(),
+      })
+    )
+  );
+  console.log(`extractText: stored ${text.length} chars on ${lessons.size} lesson(s) for ${objectName}`);
+}
+
+/** Download + extract text for directly-uploaded PDFs / DOCX resources. */
+async function extractFromOriginal(bucket: Bucket, name: string): Promise<void> {
+  const kind = extractionKind(name);
+  if (!kind) return;
+  const [bytes] = await bucket.file(name).download();
+  const text = kind === "pdf" ? await pdfBufferToText(bytes) : await docxBufferToText(bytes);
+  await storeExtractedText(name, text);
 }
 
 export const convertOfficeToPdf = onObjectFinalized(
@@ -188,15 +267,30 @@ export const convertOfficeToPdf = onObjectFinalized(
   },
   async (event) => {
     const name = event.data.name ?? "";
-    if (!shouldAutoConvert(name)) return;
-
     const size = Number(event.data.size ?? 0);
+    const bucket = admin.storage().bucket(event.data.bucket);
+
+    // Directly-uploaded PDFs / DOCX need no conversion — only text extraction
+    // so the AI tutor can ground answers in the file's content.
+    if (!shouldAutoConvert(name)) {
+      if (extractionKind(name) && size <= MAX_SOURCE_BYTES) {
+        try {
+          // Lesson docs are usually written moments AFTER the upload finishes
+          // — give Firestore a beat so the filePath query can find them.
+          await new Promise((r) => setTimeout(r, 15000));
+          await extractFromOriginal(bucket, name);
+        } catch (err) {
+          console.error(`extractText failed for ${name}:`, err);
+        }
+      }
+      return;
+    }
+
     if (size > MAX_SOURCE_BYTES) {
       console.warn(`convertOfficeToPdf: ${name} is ${size}B — over the limit, skipping.`);
       return;
     }
 
-    const bucket = admin.storage().bucket(event.data.bucket);
     const targetPath = convertedPathFor(name);
 
     // Idempotency: finalize events can re-fire (overwrites, retries)
@@ -207,6 +301,8 @@ export const convertOfficeToPdf = onObjectFinalized(
     }
 
     try {
+      // Same write-ordering beat as above before convertOne's extraction step
+      await new Promise((r) => setTimeout(r, 15000));
       await convertOne(bucket, name);
     } catch (err) {
       // Never throw: a failed conversion must not retry-storm or affect the
@@ -227,6 +323,8 @@ const ERROR_SNIPPET_CHARS = 200;
 interface BackfillResponse {
   totalCandidates: number;
   converted: string[];
+  /** PDFs/DOCX whose text was extracted for the AI tutor this batch. */
+  extracted: string[];
   failed: Array<{ name: string; error: string }>;
   remaining: number;
 }
@@ -280,9 +378,34 @@ export const backfillOfficeConversions = onCall(
       }
     }
 
+    // Extraction backfill: directly-uploaded PDFs/DOCX whose lesson docs
+    // still lack extractedText (cheap text work — generous separate cap).
+    const extracted: string[] = [];
+    const extractables = [...allNames].filter((n) => extractionKind(n) !== null);
+    let extractionBudget = 10;
+    for (const name of extractables) {
+      if (extractionBudget <= 0) break;
+      try {
+        const lessons = await db
+          .collectionGroup("lessons")
+          .where("filePath", "==", name)
+          .get();
+        const needs = lessons.docs.some((d) => !d.data().extractedText);
+        if (!needs) continue;
+        extractionBudget--;
+        await extractFromOriginal(bucket, name);
+        extracted.push(name);
+      } catch (err) {
+        console.error(`backfill extraction failed for ${name}:`, err);
+        const message = err instanceof Error ? err.message : String(err);
+        failed.push({ name, error: message.slice(0, ERROR_SNIPPET_CHARS) });
+      }
+    }
+
     const result: BackfillResponse = {
       totalCandidates: candidates.length,
       converted,
+      extracted,
       failed,
       remaining: candidates.length - batch.length,
     };

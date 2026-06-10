@@ -4,6 +4,8 @@ import {
   convertedPathFor,
   sofficeOutputName,
   extensionOf,
+  isConvertedTwin,
+  extractionKind,
 } from "../functions/src/officeConvert";
 
 describe("shouldAutoConvert", () => {
@@ -49,6 +51,33 @@ describe("sofficeOutputName", () => {
   it("replaces the extension with .pdf", () => {
     expect(sofficeOutputName("resources/c1/m1/deck.pptx")).toBe("deck.pdf");
     expect(sofficeOutputName("resources/c1/m1/my.file.ppt")).toBe("my.file.pdf");
+  });
+});
+
+describe("isConvertedTwin", () => {
+  it("detects conversion artifacts", () => {
+    expect(isConvertedTwin("resources/c/m/deck.pptx.pdf")).toBe(true);
+    expect(isConvertedTwin("resources/c/m/old.ppt.pdf")).toBe(true);
+    expect(isConvertedTwin("resources/c/m/legacy.doc.pdf")).toBe(true);
+  });
+  it("does not flag ordinary PDFs or sources", () => {
+    expect(isConvertedTwin("resources/c/m/handout.pdf")).toBe(false);
+    expect(isConvertedTwin("resources/c/m/deck.pptx")).toBe(false);
+  });
+});
+
+describe("extractionKind", () => {
+  it("classifies direct extraction targets", () => {
+    expect(extractionKind("resources/c/m/handout.pdf")).toBe("pdf");
+    expect(extractionKind("resources/c/m/notes.docx")).toBe("docx");
+  });
+  it("returns null for twins (their text comes from the conversion pipeline)", () => {
+    expect(extractionKind("resources/c/m/deck.pptx.pdf")).toBe(null);
+  });
+  it("returns null for office sources and non-resources", () => {
+    expect(extractionKind("resources/c/m/deck.pptx")).toBe(null);
+    expect(extractionKind("videos/c/m/clip.pdf")).toBe(null);
+    expect(extractionKind("resources/c/m/notes.txt")).toBe(null);
   });
 });
 

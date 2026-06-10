@@ -124,20 +124,29 @@ jobs:
       # soffice. Debs are amd64 (the functions runtime arch).
       - name: Vendor LibreOffice runtime libraries
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          sudo apt-get update -qq || true
           mkdir -p /tmp/lo-debs functions/vendor-libs/fonts
           cd /tmp/lo-debs
+          # Per-package failures must not kill the deploy — a genuinely
+          # missing lib resurfaces as a named soffice error we can act on.
           for pkg in libsm6 libice6 libxext6 libxinerama1 libxrender1 \
                      libx11-6 libxau6 libxdmcp6 libxcb1 libbsd0 libmd0 \
                      libfontconfig1 libfreetype6 libpng16-16 libexpat1 \
                      libbrotli1 libuuid1 fonts-dejavu-core; do
-            apt-get download "$pkg:amd64" || apt-get download "$pkg"
+            apt-get download "$pkg:amd64" 2>/dev/null \
+              || apt-get download "$pkg" 2>/dev/null \
+              || echo "WARN: could not download $pkg — continuing"
           done
-          for deb in *.deb; do dpkg-deb -x "$deb" extract/; done
-          cp -av extract/usr/lib/x86_64-linux-gnu/*.so* "$GITHUB_WORKSPACE/functions/vendor-libs/" 2>/dev/null || true
-          cp -av extract/lib/x86_64-linux-gnu/*.so* "$GITHUB_WORKSPACE/functions/vendor-libs/" 2>/dev/null || true
-          find extract -name "*.ttf" -exec cp -v {} "$GITHUB_WORKSPACE/functions/vendor-libs/fonts/" \;
-          ls -la "$GITHUB_WORKSPACE/functions/vendor-libs" | head -30
+          mkdir -p extract
+          for deb in *.deb; do
+            [ -e "$deb" ] && dpkg-deb -x "$deb" extract/ || true
+          done
+          cp -a extract/usr/lib/x86_64-linux-gnu/. "$GITHUB_WORKSPACE/functions/vendor-libs/" 2>/dev/null || true
+          cp -a extract/lib/x86_64-linux-gnu/. "$GITHUB_WORKSPACE/functions/vendor-libs/" 2>/dev/null || true
+          find extract -name "*.ttf" -exec cp {} "$GITHUB_WORKSPACE/functions/vendor-libs/fonts/" \; 2>/dev/null || true
+          echo "Vendored $(ls "$GITHUB_WORKSPACE/functions/vendor-libs" | wc -l) entries:"
+          ls "$GITHUB_WORKSPACE/functions/vendor-libs" | head -40
 
       - name: Enable Next.js web-frameworks support
         run: npx firebase-tools@15 experiments:enable webframeworks

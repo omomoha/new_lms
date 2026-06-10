@@ -98,15 +98,19 @@ export default function LessonPage() {
       const enrollSnap = await getDoc(doc(db, "enrollments", `${appUser.uid}_${courseId}`));
       if (enrollSnap.exists()) setEnrollment(enrollSnap.data() as Enrollment);
 
-      // Progress for sidebar completion states
+      // Progress for sidebar completion states — ONE query for all of the
+      // user's progress docs instead of a getDoc per lesson (smoke test
+      // showed cold lesson-page loads paying for the N+1 round-trips).
       const allLessons = Object.values(lMap).flat();
+      const lessonIdSet = new Set(allLessons.map((l) => l.id));
       const pMap: Record<string, LessonProgress> = {};
-      await Promise.all(
-        allLessons.map(async (l: import("@/types").Lesson) => {
-          const snap = await getDoc(doc(db, "progress", `${appUser.uid}_${l.id}`));
-          if (snap.exists()) pMap[l.id] = snap.data() as LessonProgress;
-        })
+      const progressSnap = await getDocs(
+        query(collection(db, "progress"), where("userId", "==", appUser.uid))
       );
+      progressSnap.docs.forEach((d) => {
+        const p = d.data() as LessonProgress;
+        if (p.lessonId && lessonIdSet.has(p.lessonId)) pMap[p.lessonId] = p;
+      });
       setProgressMap(pMap);
 
       // Quiz lesson: load assessment and latest attempt

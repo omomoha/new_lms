@@ -39,3 +39,25 @@ export function sofficeOutputName(objectName: string): string {
   const dot = base.lastIndexOf(".");
   return `${dot === -1 ? base : base.slice(0, dot)}.pdf`;
 }
+
+/** Is this object a conversion artifact we created (deck.pptx.pdf)? */
+export function isConvertedTwin(objectName: string): boolean {
+  return /\.(pptx|ppt|doc)\.pdf$/i.test(objectName);
+}
+
+/**
+ * Text-extraction strategy for a lesson resource (feeds the AI tutor):
+ *  - "pdf"  → parse the PDF directly (pdf-parse)
+ *  - "docx" → mammoth extractRawText
+ *  - null   → no direct extraction (office formats are extracted from their
+ *             converted PDF twin inside the conversion pipeline; everything
+ *             else has no text path)
+ */
+export function extractionKind(objectName: string): "pdf" | "docx" | null {
+  if (!objectName.startsWith("resources/")) return null;
+  if (isConvertedTwin(objectName)) return null;
+  const ext = extensionOf(objectName);
+  if (ext === "pdf") return "pdf";
+  if (ext === "docx") return "docx";
+  return null;
+}
