@@ -132,3 +132,67 @@
     font-family: Georgia, 'Times New Roman', serif;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Dark mode — class-based (html.dark), toggled from the nav bar.
+   Strategy: override the shared component classes and the brand utility
+   classes actually used across the app. Reading surfaces (text lessons,
+   converted documents) intentionally stay paper-light, like a PDF reader.
+   Placed after the @tailwind directives so these win the cascade.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.dark body {
+  background-color: #0F1A17;
+  color: #DEE9E4;
+}
+
+/* Components */
+.dark .card {
+  background-color: #16241F;
+  border-color: #2A453F;
+}
+.dark .input-field {
+  background-color: #0F1A17;
+  border-color: #2A453F;
+  color: #DEE9E4;
+}
+.dark .input-field::placeholder {
+  color: #8AA39B;
+}
+.dark .btn-secondary {
+  background-color: #16241F;
+  border-color: #2A453F;
+  color: #CFE0D5;
+}
+.dark .btn-secondary:hover:not(:disabled) {
+  background-color: #1B332D;
+}
+/* .page-hero, .kicker, .btn-primary stay as-is: already dark-friendly */
+
+/* Brand utility overrides */
+.dark .text-brand-ink { color: #DEE9E4; }
+.dark .text-brand-muted { color: #9DB3AC; }
+.dark .text-brand-primary { color: #BBD3C4; }
+.dark .text-brand-teal { color: #7FBFAF; }
+.dark .bg-brand-cream { background-color: #0F1A17; }
+.dark .bg-brand-mint { background-color: #1B332D; }
+.dark .border-brand-line { border-color: #2A453F; }
+.dark .bg-white { background-color: #16241F; }
+
+/* Alert palettes */
+.dark .bg-red-50 { background-color: #3A1515; }
+.dark .border-red-200 { border-color: #5C2222; }
+.dark .text-red-700 { color: #F1B8B8; }
+.dark .bg-amber-100 { background-color: #3D2E10; }
+.dark .text-amber-800 { color: #F0D49A; }
+
+/* Reading surfaces stay light (document reader feel; PDF canvas is white) */
+.dark .card.text-lesson-wrapper {
+  background-color: #F5F7F4;
+  border-color: #DDE6DF;
+}
+.dark .card:has(> .text-lesson-wrapper) {
+  background-color: #F5F7F4;
+  border-color: #DDE6DF;
+}
+.dark .card:has(> .text-lesson-wrapper) .text-brand-muted { color: #5E6E69; }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
 import NotificationsBell from "@/components/notifications/NotificationsBell";
+import ThemeToggle from "@/components/ui/ThemeToggle";
 
 export default function LearnerShell({ children }: { children: React.ReactNode }) {
   const { user, appUser, loading, signOut } = useAuth();
@@ -25,6 +26,7 @@ export default function LearnerShell({ children }: { children: React.ReactNode }
           Andela <span className="text-white font-light">LMS</span>
         </Link>
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           {user && <NotificationsBell uid={user.uid} />}
           <Link
             href="/learn/profile"

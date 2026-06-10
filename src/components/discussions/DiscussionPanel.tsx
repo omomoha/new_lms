@@ -109,7 +109,16 @@ export default function DiscussionPanel({ courseId, lessonId }: DiscussionPanelP
     try {
       // Single equality filter (no composite index needed); courseId filtered below.
       const snap = await getDocs(
-        query(collection(db, "discussions"), where("lessonId", "==", lessonId))
+        query(
+          collection(db, "discussions"),
+          // BOTH equality filters are required: the security rule resolves the
+          // course doc from resource.data.courseId, which is only provable for
+          // list queries when courseId is pinned by the query itself. A
+          // lessonId-only query is denied for learners ("Could not load the
+          // discussion").
+          where("courseId", "==", courseId),
+          where("lessonId", "==", lessonId)
+        )
       );
       const next: DiscussionDoc[] = [];
       snap.forEach((d) => {

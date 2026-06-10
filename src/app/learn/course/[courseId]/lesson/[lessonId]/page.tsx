@@ -406,9 +406,6 @@ export default function LessonPage() {
                       allowFullScreen
                     />
                   </div>
-                  <p className="text-xs text-brand-muted">
-                    Video hosted externally — watch progress is not tracked automatically.
-                  </p>
                   {lesson.transcript && (
                     <TranscriptPanel
                       transcript={lesson.transcript}

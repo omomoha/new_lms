@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
+import ThemeToggle from "@/components/ui/ThemeToggle";
 
 const NAV = [
   { href: "/admin", label: "Dashboard" },
@@ -67,6 +68,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             })}
           </nav>
           <div className="flex items-center gap-3 flex-shrink-0">
+            <ThemeToggle />
             <span className="text-xs text-white/50 hidden sm:block truncate max-w-[140px]">
               {appUser?.name || appUser?.email}
             </span>

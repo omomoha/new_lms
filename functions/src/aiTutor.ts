@@ -156,10 +156,18 @@ export const askTutor = onCall<AskTutorRequest>(
         const body = [d.content, d.textContent, d.transcript, d.extractedText]
           .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
           .join("\n\n");
-        context = `# ${d.title ?? "Lesson"}\n${body}`;
+        // Only count this as usable context when the lesson actually has a
+        // body — a bare title previously short-circuited the course-level
+        // fallback, leaving the tutor with nothing to ground on (e.g. video
+        // lessons without transcripts).
+        if (body.trim()) {
+          context = `# ${d.title ?? "Lesson"}\n${body}`;
+        }
       }
     }
     if (!context.trim()) {
+      // Fall back to ALL of the course's stored content: text lessons,
+      // drafted bodies, transcripts, and text extracted from uploaded files.
       context = await collectCourseText(courseId, { maxChars: MAX_CONTEXT_CHARS });
     }
     context = context.slice(0, MAX_CONTEXT_CHARS);
