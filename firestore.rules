@@ -137,12 +137,16 @@ service cloud.firestore {
     match /progress/{progressId} {
       // Learner can read/write their own progress docs.
       // progressId format: "{userId}_{lessonId}"
-      // READ is field-based (resource.data.userId) so list queries filtered by
-      // userId == request.auth.uid are provable (needed by the streak card —
-      // a doc-ID prefix rule denies ALL list queries). Single-doc gets still
-      // work because every progress write stamps userId (enforced below).
+      // READ allows EITHER form:
+      //  - doc-ID prefix: single gets, including docs that don't exist yet
+      //    (the lesson page gets progress/{uid}_{lessonId} before first write —
+      //    a field-only rule throws on resource == null and denies those)
+      //  - field-based (resource.data.userId): makes list queries filtered by
+      //    userId == request.auth.uid provable (needed by the streak card)
       allow read: if isAdmin()
-        || (isAuthed() && resource.data.userId == request.auth.uid);
+        || (isAuthed()
+            && (progressId.matches(request.auth.uid + "_.*")
+                || resource.data.userId == request.auth.uid));
       allow write: if isAdmin()
         || (isAuthed()
             && progressId.matches(request.auth.uid + "_.*")
@@ -153,8 +157,11 @@ service cloud.firestore {
     // "Was this lesson helpful?" ratings. Learner writes their own doc;
     // admins can read everything for content analytics.
     match /lessonFeedback/{feedbackId} {
+      // ID-prefix branch covers gets of not-yet-written docs (prefill check).
       allow read: if isAdmin()
-        || (isAuthed() && resource.data.userId == request.auth.uid);
+        || (isAuthed()
+            && (feedbackId.matches(request.auth.uid + "_.+")
+                || resource.data.userId == request.auth.uid));
       allow write: if isAuthed()
         && feedbackId.matches(request.auth.uid + "_.+")
         && request.resource.data.userId == request.auth.uid
@@ -169,8 +176,11 @@ service cloud.firestore {
     // AI lab grades — written ONLY by the gradeLab function (admin SDK), so
     // learners cannot forge scores. Learner reads their own; admins all.
     match /labGrades/{gradeId} {
+      // ID-prefix branch covers gets of not-yet-graded submissions.
       allow read: if isAdmin()
-        || (isAuthed() && resource.data.userId == request.auth.uid);
+        || (isAuthed()
+            && (gradeId.matches(request.auth.uid + "_.+")
+                || resource.data.userId == request.auth.uid));
       allow write: if false; // gradeLab function only
     }
 

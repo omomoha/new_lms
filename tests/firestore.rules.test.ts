@@ -22,7 +22,16 @@ import {
 } from "@firebase/rules-unit-testing";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  getDoc,
+  getDocs,
+  updateDoc,
+  collection,
+  query,
+  where,
+} from "firebase/firestore";
 
 let testEnv: RulesTestEnvironment;
 
@@ -55,6 +64,35 @@ beforeAll(async () => {
       title: "Other Course",
       status: "published",
       assignedCohortIds: ["cohort-other"],
+    });
+    // Seeded progress doc (streak list-query test)
+    await setDoc(doc(db, "progress", "learner-uid_lessonSeeded"), {
+      userId: "learner-uid",
+      lessonId: "lessonSeeded",
+      courseId: "course-mine",
+      completedAt: new Date(),
+    });
+    // Seeded flashcard (scheduling-field-update tests)
+    await setDoc(doc(db, "flashcards", "card1"), {
+      userId: "learner-uid",
+      courseId: "course-mine",
+      moduleId: null,
+      front: "What is a closure?",
+      back: "A function plus its lexical scope.",
+      interval: 0,
+      ease: 2.5,
+      reps: 0,
+      due: new Date(),
+    });
+    // Seeded lab grade (server-written; learners must not modify)
+    await setDoc(doc(db, "labGrades", "learner-uid_lesson1"), {
+      userId: "learner-uid",
+      courseId: "course-mine",
+      lessonId: "lesson1",
+      score: 82,
+      summary: "Good work",
+      strengths: ["clear"],
+      improvements: ["tests"],
     });
   });
 });
@@ -102,6 +140,185 @@ describe("learner progress isolation", () => {
     const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
     await assertSucceeds(
       getDoc(doc(learner.firestore(), "progress", "learner-uid_lesson1"))
+    );
+  });
+
+  it("allows learner LIST-querying their own progress by userId (streaks)", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(learner.firestore(), "progress"),
+          where("userId", "==", "learner-uid")
+        )
+      )
+    );
+  });
+
+  it("denies learner LIST-querying another user's progress", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertFails(
+      getDocs(
+        query(
+          collection(learner.firestore(), "progress"),
+          where("userId", "==", "other-uid")
+        )
+      )
+    );
+  });
+
+  it("denies progress write that forges another userId", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertFails(
+      setDoc(doc(learner.firestore(), "progress", "learner-uid_lesson2"), {
+        userId: "other-uid",
+        lessonId: "lesson2",
+        courseId: "course-mine",
+      })
+    );
+  });
+});
+
+// ── (vi) lessonFeedback validation ──────────────────────────────────────────
+describe("lessonFeedback rules", () => {
+  it("allows owner writing valid feedback", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertSucceeds(
+      setDoc(doc(learner.firestore(), "lessonFeedback", "learner-uid_lesson1"), {
+        userId: "learner-uid",
+        lessonId: "lesson1",
+        courseId: "course-mine",
+        rating: 4,
+        comment: "Great lesson",
+      })
+    );
+  });
+
+  it("denies out-of-range rating", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertFails(
+      setDoc(doc(learner.firestore(), "lessonFeedback", "learner-uid_lesson1"), {
+        userId: "learner-uid",
+        lessonId: "lesson1",
+        courseId: "course-mine",
+        rating: 7,
+        comment: "",
+      })
+    );
+  });
+
+  it("denies writing feedback under another user's doc id", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertFails(
+      setDoc(doc(learner.firestore(), "lessonFeedback", "other-uid_lesson1"), {
+        userId: "other-uid",
+        lessonId: "lesson1",
+        courseId: "course-mine",
+        rating: 1,
+        comment: "",
+      })
+    );
+  });
+
+  it("allows owner get of their not-yet-written feedback doc", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertSucceeds(
+      getDoc(doc(learner.firestore(), "lessonFeedback", "learner-uid_lessonNew"))
+    );
+  });
+});
+
+// ── (vii) labGrades: server-written only ────────────────────────────────────
+describe("labGrades rules", () => {
+  it("allows learner reading their own grade", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertSucceeds(
+      getDoc(doc(learner.firestore(), "labGrades", "learner-uid_lesson1"))
+    );
+  });
+
+  it("allows owner get of a not-yet-graded submission doc", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertSucceeds(
+      getDoc(doc(learner.firestore(), "labGrades", "learner-uid_lessonNew"))
+    );
+  });
+
+  it("denies learner forging/overwriting a grade", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertFails(
+      setDoc(doc(learner.firestore(), "labGrades", "learner-uid_lesson1"), {
+        userId: "learner-uid",
+        score: 100,
+      })
+    );
+  });
+
+  it("denies learner reading another user's grade", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertFails(
+      getDoc(doc(learner.firestore(), "labGrades", "other-uid_lesson1"))
+    );
+  });
+});
+
+// ── (viii) flashcards: scheduling-only client updates ───────────────────────
+describe("flashcards rules", () => {
+  it("allows owner updating ONLY scheduling fields", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertSucceeds(
+      updateDoc(doc(learner.firestore(), "flashcards", "card1"), {
+        interval: 1,
+        ease: 2.35,
+        reps: 1,
+        due: new Date(),
+      })
+    );
+  });
+
+  it("denies owner editing card content", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertFails(
+      updateDoc(doc(learner.firestore(), "flashcards", "card1"), {
+        front: "Tampered",
+      })
+    );
+  });
+
+  it("denies client creating flashcards", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertFails(
+      setDoc(doc(learner.firestore(), "flashcards", "card-forged"), {
+        userId: "learner-uid",
+        front: "x",
+        back: "y",
+        interval: 0,
+        ease: 2.5,
+        reps: 0,
+        due: new Date(),
+      })
+    );
+  });
+
+  it("allows owner list-querying their own cards", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(learner.firestore(), "flashcards"),
+          where("userId", "==", "learner-uid")
+        )
+      )
+    );
+  });
+});
+
+// ── (ix) aiUsage: fully server-side ─────────────────────────────────────────
+describe("aiUsage rules", () => {
+  it("denies a user reading even their own usage doc", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertFails(
+      getDoc(doc(learner.firestore(), "aiUsage", "learner-uid"))
     );
   });
 });
