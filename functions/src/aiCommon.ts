@@ -250,11 +250,20 @@ export async function collectCourseText(
       .get();
     for (const l of lessonsSnap.docs) {
       if (out.length >= maxChars) break;
-      const d = l.data() as { title?: string; type?: string; content?: string };
+      const d = l.data() as {
+        title?: string;
+        type?: string;
+        content?: string;
+        textContent?: string;
+        transcript?: string;
+        /** Extracted from uploaded PDF/DOCX/deck files by the conversion pipeline */
+        extractedText?: string;
+      };
       out += `\n## ${d.title ?? "Untitled lesson"}\n`;
-      if (typeof d.content === "string" && d.content.trim()) {
-        out += d.content.slice(0, 8000) + "\n";
-      }
+      const body = [d.content, d.textContent, d.transcript, d.extractedText]
+        .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+        .join("\n");
+      if (body) out += body.slice(0, 8000) + "\n";
     }
   }
   return out.slice(0, maxChars);
