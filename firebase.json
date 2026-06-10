@@ -7,8 +7,7 @@
       "**/node_modules/**"
     ],
     "frameworksBackend": {
-      "region": "us-central1",
-      "minInstances": 1
+      "region": "us-central1"
     }
   },
   "firestore": {

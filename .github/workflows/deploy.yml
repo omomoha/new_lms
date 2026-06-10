@@ -168,3 +168,14 @@ jobs:
           NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+
+      # Keep the SSR function warm. minInstances can't be set via
+      # frameworksBackend ("minInstances ... pinTags=true ... not currently
+      # compatible"), so pin it on the underlying Cloud Run service after the
+      # deploy instead. Non-fatal: a failure here must never fail the deploy.
+      - name: Keep SSR instance warm (min-instances 1)
+        run: |
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/sa.json" || { echo "WARN: gcloud auth failed"; exit 0; }
+          gcloud run services update ssrandelalmsdae5f \
+            --project "$PROJECT_ID" --region us-central1 --min-instances 1 \
+            || echo "WARN: could not set min-instances (service account may lack run.admin) — pages will cold-start"
