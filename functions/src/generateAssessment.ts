@@ -23,6 +23,7 @@ import {
   consumeQuota,
   callClaude,
   fenceUntrusted,
+  capText,
   extractJson,
   collectCourseText,
 } from "./aiCommon";
@@ -50,6 +51,9 @@ interface GenerateAssessmentRequest {
   moduleId?: string;
   kind: "pre" | "post" | "quiz";
   numQuestions: number;
+  /** Optional admin-pasted learning material. When provided it becomes the
+   *  question source instead of the course's stored lesson content. */
+  sourceText?: string;
 }
 
 interface GenerateAssessmentResponse {
@@ -82,15 +86,20 @@ export const generateAssessment = onCall<GenerateAssessmentRequest>(
     // ── Quota ────────────────────────────────────────────────────────────
     await consumeQuota(auth.uid, "quizgen", 10);
 
-    // ── Gather course content ────────────────────────────────────────────
-    const content = await collectCourseText(courseId, {
-      ...(moduleId ? { moduleId } : {}),
-      maxChars: MAX_CONTENT_CHARS,
-    });
+    // ── Gather content: admin-pasted material wins; else stored lessons ──
+    const provided = capText(request.data.sourceText, MAX_CONTENT_CHARS);
+    const content =
+      provided.length >= MIN_CONTENT_CHARS
+        ? provided
+        : await collectCourseText(courseId, {
+            ...(moduleId ? { moduleId } : {}),
+            maxChars: MAX_CONTENT_CHARS,
+          });
     if (content.trim().length < MIN_CONTENT_CHARS) {
       throw new HttpsError(
         "failed-precondition",
-        "Not enough lesson content to generate an assessment. Add text content to lessons first."
+        "Not enough learning content to generate from. Paste the learning material " +
+          "into the generator, or add text content to the course's lessons first."
       );
     }
 

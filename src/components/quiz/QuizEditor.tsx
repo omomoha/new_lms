@@ -77,6 +77,8 @@ interface GenerateAssessmentRequest {
   moduleId?: string;
   kind: AssessmentKind;
   numQuestions: number;
+  /** Optional pasted learning material — overrides stored lesson content. */
+  sourceText?: string;
 }
 
 interface GenerateAssessmentResponse {
@@ -154,6 +156,7 @@ export default function QuizEditor({
   // Generate with AI
   const [showGenPanel, setShowGenPanel] = useState(false);
   const [genNumQuestions, setGenNumQuestions] = useState(5);
+  const [genSourceText, setGenSourceText] = useState("");
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   // Generated questions waiting on a Replace/Append decision
@@ -318,6 +321,7 @@ export default function QuizEditor({
         ...(moduleId ? { moduleId } : {}),
         kind,
         numQuestions: num,
+        ...(genSourceText.trim() ? { sourceText: genSourceText.trim() } : {}),
       });
       const drafts = generatedToDrafts(result.data.questions);
       if (drafts.length === 0) {
@@ -470,10 +474,35 @@ export default function QuizEditor({
         <div className="rounded-lg p-3 text-xs space-y-2 border bg-brand-mint border-brand-line text-brand-ink">
           <p className="font-semibold text-brand-primary">Generate questions with AI</p>
           <p className="text-brand-muted">
-            Drafts multiple-choice questions from the{" "}
-            {moduleId ? "module's" : "course's"} lesson content. Review and edit
-            before saving.
+            Paste the learning material below, or leave it empty to use the{" "}
+            {moduleId ? "module's" : "course's"} stored lesson content. Review
+            and edit the drafted questions before saving.
           </p>
+          <div>
+            <label
+              htmlFor="gen-source-text"
+              className="block font-medium text-brand-muted mb-1"
+            >
+              Learning content (optional)
+            </label>
+            <textarea
+              id="gen-source-text"
+              className="input-field text-xs resize-y font-mono"
+              rows={6}
+              maxLength={30000}
+              placeholder={
+                "Paste the source material for the questions — lesson notes, a syllabus section, " +
+                "transcript, or the text of a slide deck…\n\nLeave empty to generate from the " +
+                "lessons already saved on this " + (moduleId ? "module." : "course.")
+              }
+              value={genSourceText}
+              onChange={(e) => setGenSourceText(e.target.value)}
+              disabled={generating}
+            />
+            <p className="text-right text-brand-muted mt-0.5">
+              {genSourceText.length.toLocaleString()} / 30,000
+            </p>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <label htmlFor="gen-num-questions" className="font-medium text-brand-muted">
               Number of questions:
