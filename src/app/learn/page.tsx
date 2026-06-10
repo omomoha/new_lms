@@ -48,8 +48,10 @@ export default function LearnDashboard() {
             const fresh = (meSnap.data() as { cohortIds?: unknown }).cohortIds;
             if (Array.isArray(fresh)) userCohortIds = fresh as string[];
           }
-        } catch {
-          /* keep cached membership */
+        } catch (err: unknown) {
+          // Keep cached membership but leave a trace for debugging —
+          // a silently stale list here looks like "missing courses" to users.
+          console.warn("LearnDashboard: fresh cohort read failed, using cached:", err);
         }
 
         // Fetch enrollments for progress (only matters for accessible courses)
@@ -169,9 +171,11 @@ export default function LearnDashboard() {
                     <span
                       className="absolute top-2 right-2 text-base leading-none px-2 py-1 rounded-full font-semibold"
                       style={{ backgroundColor: "rgba(0,0,0,0.35)", color: "#fff", fontSize: "1rem" }}
-                      aria-label="Locked"
+                      role="img"
+                      aria-label="Course locked"
                     >
-                      🔒
+                      <span aria-hidden="true">🔒</span>
+                      <span className="sr-only">Course locked</span>
                     </span>
                   </div>
                   <div className="px-4 sm:px-5 pb-4 pt-3">

@@ -72,8 +72,8 @@ export function toEmbedUrl(url: string): EmbedResult | null {
 
   // ── Google Drive ───────────────────────────────────────────────────────────
   if (host === "drive.google.com") {
-    // /file/d/<id>/...
-    const driveMatch = parsed.pathname.match(/^\/file\/d\/([A-Za-z0-9_-]+)\//);
+    // /file/d/<id> or /file/d/<id>/... — trailing segment optional, id bounded
+    const driveMatch = parsed.pathname.match(/^\/file\/d\/([A-Za-z0-9_-]{10,128})(?:\/|$)/);
     if (driveMatch) {
       return {
         embedUrl: `https://drive.google.com/file/d/${driveMatch[1]}/preview`,

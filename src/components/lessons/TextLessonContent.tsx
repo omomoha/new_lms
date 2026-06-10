@@ -22,6 +22,15 @@ import React, {
 } from "react";
 import DOMPurify from "isomorphic-dompurify";
 
+// Raw-HTML lessons may carry <a target="_blank"> without rel — force
+// noopener/noreferrer on every link that opens a new browsing context
+// (reverse-tabnabbing hardening). Registered once per module load.
+DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+  if (node.tagName === "A" && node.getAttribute("target")) {
+    node.setAttribute("rel", "noopener noreferrer");
+  }
+});
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TocEntry {

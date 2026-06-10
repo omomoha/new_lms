@@ -55,15 +55,26 @@ export const getSignedVideoUrl = onCall<GetSignedVideoUrlRequest>(
     if (!storagePath || typeof storagePath !== "string") {
       throw new HttpsError("invalid-argument", "storagePath is required.");
     }
-    // Must be a video path; no traversal tricks.
-    if (!storagePath.startsWith("videos/") || storagePath.includes("..")) {
+    // Must be a video path; no traversal tricks, no empty segments
+    // ("videos//x" would otherwise yield an empty courseId).
+    if (
+      !storagePath.startsWith("videos/") ||
+      storagePath.includes("..") ||
+      storagePath.includes("//") ||
+      storagePath.length > 1024
+    ) {
       throw new HttpsError("invalid-argument", "Invalid video path.");
     }
     const segments = storagePath.split("/");
-    if (segments.length < 3) {
+    if (segments.length < 3 || segments.some((s) => !s)) {
       throw new HttpsError("invalid-argument", "Invalid video path.");
     }
     const courseId = segments[1];
+    // Course IDs are Firestore auto-IDs (or admin-set slugs) — never anything
+    // outside this charset. Rejecting here prevents odd doc paths below.
+    if (!/^[A-Za-z0-9_-]+$/.test(courseId)) {
+      throw new HttpsError("invalid-argument", "Invalid video path.");
+    }
 
     // ── Authorize ────────────────────────────────────────────────────────
     const isAdmin = request.auth.token.role === "admin";

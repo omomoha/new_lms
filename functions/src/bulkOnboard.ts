@@ -64,6 +64,19 @@ function generateTempPassword(): string {
 // Fix #12: cohort_tag field guard regex
 const COHORT_TAG_RE = /^[\w-]{1,64}$/;
 
+// Server-side email format guard (client CSV validation is not trusted)
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Escape a string for safe interpolation into email HTML. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export const bulkOnboard = onCall(
   { region: "us-central1", enforceAppCheck: process.env.ENFORCE_APPCHECK === "true" },
   async (request) => {
@@ -91,6 +104,16 @@ export const bulkOnboard = onCall(
           email,
           status: "error",
           error: `Invalid role "${role}". Must be one of: ${VALID_ROLES.join(", ")}.`,
+        });
+        continue;
+      }
+
+      // Server-side email validation
+      if (!email || typeof email !== "string" || !EMAIL_RE.test(email)) {
+        results.push({
+          email: String(email ?? ""),
+          status: "error",
+          error: "invalid email address",
         });
         continue;
       }
@@ -231,14 +254,16 @@ export const bulkOnboard = onCall(
         // 5. Write mail doc for Firebase Trigger Email extension.
         //    Fix #11: mail body contains the reset link, NOT the plaintext password.
         //    See: https://extensions.dev/extensions/firebase/firestore-send-email
+        // Sanitise the CSV-supplied name before email interpolation
+        const safeName = name.replace(/[\r\n]+/g, " ").trim();
         await db.collection("mail").add({
           to: email,
           message: {
             subject: "Welcome to Andela Learn — set your password",
-            text: `Hi ${name},\n\nYour Andela Learn account is ready.\n\nEmail: ${email}\n\nPlease set your password using the link below (valid for 1 hour):\n${resetLink}\n\nAndela Team`,
-            html: `<p>Hi ${name},</p>
+            text: `Hi ${safeName},\n\nYour Andela Learn account is ready.\n\nEmail: ${email}\n\nPlease set your password using the link below (valid for 1 hour):\n${resetLink}\n\nAndela Team`,
+            html: `<p>Hi ${escapeHtml(safeName)},</p>
 <p>Your <strong>Andela Learn</strong> account is ready.</p>
-<p>Email: <strong>${email}</strong></p>
+<p>Email: <strong>${escapeHtml(email)}</strong></p>
 <p><a href="${resetLink}">Set your password</a> (link valid for 1 hour)</p>
 <p>— Andela Team</p>`,
           },

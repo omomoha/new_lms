@@ -177,6 +177,8 @@ export default function LessonPage() {
   const handleLessonComplete = useCallback(() => {
     const flat = Object.values(lessonMap).flat();
     const idx = flat.findIndex((l) => l.id === lessonId);
+    // idx === -1 would make flat[0] the "next" lesson — guard against it.
+    if (idx === -1) return;
     const next = flat[idx + 1];
     if (next) router.push(`/learn/course/${courseId}/lesson/${next.id}`);
   }, [lessonMap, lessonId, courseId, router]);

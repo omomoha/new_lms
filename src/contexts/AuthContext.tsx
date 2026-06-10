@@ -30,7 +30,7 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import getClientAuth from "@/lib/firebase/auth";
 import db from "@/lib/firebase/firestore";
 import { initAppCheck } from "@/lib/firebase/appCheck";
@@ -99,15 +99,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // status/createdAt are unknown — use safe sentinel values.
             setAppUser(
               claimRole
-                ? ({
+                ? {
                     uid: firebaseUser.uid,
                     email: firebaseUser.email ?? "",
                     role: claimRole,
                     name: firebaseUser.displayName ?? "",
                     cohortIds: [],
                     status: "pending",
-                    createdAt: null,
-                  } as unknown as AppUser)
+                    // Sentinel — actual createdAt lives on the (not yet
+                    // readable) users/{uid} doc and is re-read on next change.
+                    createdAt: Timestamp.now(),
+                  }
                 : null
             );
           }

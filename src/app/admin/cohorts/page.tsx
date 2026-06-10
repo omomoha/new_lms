@@ -80,7 +80,7 @@ export default function CohortsPage() {
       setName("");
       setTag("");
       setAdding(false);
-      load();
+      await load();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create cohort");
     } finally {
@@ -136,11 +136,12 @@ export default function CohortsPage() {
                 key={c}
                 type="button"
                 onClick={() => setColor(c)}
-                className={`w-6 h-6 rounded-full border-2 ${
+                className={`w-6 h-6 rounded-full border-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-accent ${
                   color === c ? "border-brand-ink" : "border-transparent"
                 }`}
                 style={{ backgroundColor: c }}
-                aria-label={`color ${c}`}
+                aria-label={`Select color ${c}`}
+                aria-pressed={color === c}
               />
             ))}
           </div>

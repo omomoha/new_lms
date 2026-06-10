@@ -54,6 +54,21 @@ const PAPER = rgb(0xf5 / 255, 0xf7 / 255, 0xf4 / 255);
 const INK = rgb(0x1e / 255, 0x30 / 255, 0x2c / 255);
 const MUTED = rgb(0x5e / 255, 0x6e / 255, 0x69 / 255);
 
+/** Escape a string for safe interpolation into email HTML. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** Strip CR/LF so user-influenced strings can't inject email headers. */
+function stripNewlines(s: string): string {
+  return s.replace(/[\r\n]+/g, " ").trim();
+}
+
 function newCertId(): string {
   const alphabet = "ABCDEFGHJKMNPQRSTVWXYZ0123456789"; // unambiguous
   const bytes = randomBytes(8);
@@ -368,6 +383,42 @@ async function issueCertificateCore(
     }
   }
 
+  // Concurrency guard: autoIssueCertificate (enrollment trigger),
+  // autoIssueOnPostPass (attempt trigger) and the issueCertificate callable can
+  // all fire for the same uid+course within milliseconds. The deterministic
+  // lock doc (create() fails if it exists) makes exactly ONE of them generate
+  // the certificate; the others return the existing one.
+  const lockRef = db.doc(`certificateLocks/${uid}_${courseId}`);
+  try {
+    await lockRef.create({ createdAt: admin.firestore.FieldValue.serverTimestamp() });
+  } catch {
+    // Another invocation holds (or held) the lock — return its certificate.
+    // Brief retry: the winner may still be writing the cert doc.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      const raced = await db
+        .collection("certificates")
+        .where("userId", "==", uid)
+        .where("courseId", "==", courseId)
+        .limit(1)
+        .get();
+      if (!raced.empty) {
+        const cert = raced.docs[0].data();
+        const racedFile = admin.storage().bucket().file(`certificates/${cert.certId}.pdf`);
+        const [racedUrl] = await racedFile.getSignedUrl({
+          version: "v4", action: "read", expires: Date.now() + DOWNLOAD_TTL_MS,
+        });
+        return {
+          certId: cert.certId,
+          downloadUrl: racedUrl,
+          issuedAt: (cert.issuedAt as admin.firestore.Timestamp)?.toMillis?.() ?? Date.now(),
+          alreadyIssued: true,
+        };
+      }
+    }
+    throw new HttpsError("aborted", "Certificate issuance is already in progress. Try again shortly.");
+  }
+
   // Generate + store
   const certId = newCertId();
   const issuedDate = new Date().toLocaleDateString("en-GB", {
@@ -376,26 +427,32 @@ async function issueCertificateCore(
   const verifyUrl = `${baseUrl()}/verify/${certId}`;
   const courseTitle = course.title ?? "Untitled course";
 
-  const template = await resolveTemplate(courseId);
-  const pdfBytes = await buildCertificatePdf(
-    { learnerName, courseTitle, certId, issuedDate, verifyUrl },
-    template
-  );
-
   const file = admin.storage().bucket().file(`certificates/${certId}.pdf`);
-  await file.save(Buffer.from(pdfBytes), {
-    contentType: "application/pdf",
-    metadata: { cacheControl: "private, max-age=0" },
-  });
+  try {
+    const template = await resolveTemplate(courseId);
+    const pdfBytes = await buildCertificatePdf(
+      { learnerName, courseTitle, certId, issuedDate, verifyUrl },
+      template
+    );
 
-  await db.doc(`certificates/${certId}`).set({
-    certId,
-    userId: uid,
-    learnerName,
-    courseId,
-    courseTitle,
-    issuedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+    await file.save(Buffer.from(pdfBytes), {
+      contentType: "application/pdf",
+      metadata: { cacheControl: "private, max-age=0" },
+    });
+
+    await db.doc(`certificates/${certId}`).set({
+      certId,
+      userId: uid,
+      learnerName,
+      courseId,
+      courseTitle,
+      issuedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    // Release the lock so a later attempt can retry generation.
+    await lockRef.delete().catch(() => undefined);
+    throw err;
+  }
 
   const [downloadUrl] = await file.getSignedUrl({
     version: "v4", action: "read", expires: Date.now() + DOWNLOAD_TTL_MS,
@@ -406,22 +463,28 @@ async function issueCertificateCore(
     const [emailUrl] = await file.getSignedUrl({
       version: "v4", action: "read", expires: Date.now() + EMAIL_TTL_MS,
     });
+    // learnerName comes from a client-writable profile field and courseTitle
+    // from admin input — sanitise both before email interpolation.
+    const safeName = stripNewlines(learnerName);
+    const safeTitle = stripNewlines(courseTitle);
+    const htmlName = escapeHtml(safeName);
+    const htmlTitle = escapeHtml(safeTitle);
     await db.collection("mail").add({
       to: learnerEmail,
       message: {
-        subject: `🎓 Your certificate for "${courseTitle}" — Andela Learn`,
+        subject: `🎓 Your certificate for "${safeTitle}" — Andela Learn`,
         text:
-          `Congratulations ${learnerName}!\n\n` +
-          `You have completed "${courseTitle}".\n\n` +
+          `Congratulations ${safeName}!\n\n` +
+          `You have completed "${safeTitle}".\n\n` +
           `Download your certificate (link valid 7 days): ${emailUrl}\n` +
           `Verify any time: ${verifyUrl}\n\n` +
           `Certificate ID: ${certId}\n— Andela Learn`,
         html:
           `<div style="font-family:Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;">` +
           `<div style="background:#13403A;padding:24px;border-radius:12px 12px 0 0;">` +
-          `<h1 style="color:#F5F7F4;font-size:20px;margin:0;">Congratulations, ${learnerName}! 🎓</h1></div>` +
+          `<h1 style="color:#F5F7F4;font-size:20px;margin:0;">Congratulations, ${htmlName}! 🎓</h1></div>` +
           `<div style="border:1px solid #DDE6DF;border-top:0;padding:24px;border-radius:0 0 12px 12px;">` +
-          `<p style="color:#1E302C;">You have successfully completed <strong>${courseTitle}</strong> on Andela Learn.</p>` +
+          `<p style="color:#1E302C;">You have successfully completed <strong>${htmlTitle}</strong> on Andela Learn.</p>` +
           `<p><a href="${emailUrl}" style="display:inline-block;background:#8FB85C;color:#13403A;font-weight:bold;` +
           `padding:12px 20px;border-radius:8px;text-decoration:none;">Download your certificate (PDF)</a></p>` +
           `<p style="color:#5E6E69;font-size:13px;">The download link is valid for 7 days. You can always re-download ` +

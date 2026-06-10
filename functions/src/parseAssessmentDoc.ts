@@ -319,6 +319,15 @@ export const parseAssessmentDoc = onCall<ParseAssessmentDocRequest>(
       );
     }
 
+    // Enforce size limit BEFORE decoding — otherwise an oversized payload is
+    // fully materialised in memory just to be rejected (base64 is ~4/3 binary).
+    if (fileBase64.length > Math.ceil((MAX_BYTES * 4) / 3) + 4) {
+      throw new HttpsError(
+        "invalid-argument",
+        "File is too large. Maximum allowed size is 5 MB."
+      );
+    }
+
     // Decode base64 and enforce size limit
     let buffer: Buffer;
     try {
