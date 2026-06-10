@@ -17,3 +17,13 @@ export {
   autoIssueOnPostPass,
   previewCertificate,
 } from "./certificates";
+
+// ── AI features (require ANTHROPIC_API_KEY in the runtime env) ──────────────
+export { askTutor } from "./aiTutor";
+export { generateAssessment } from "./generateAssessment";
+export { gradeLab } from "./gradeLab";
+export { generateFlashcards } from "./flashcardsGen";
+export { adminCopilot } from "./adminCopilot";
+
+// ── Retention ────────────────────────────────────────────────────────────────
+export { learnerReminders } from "./learnerReminders";

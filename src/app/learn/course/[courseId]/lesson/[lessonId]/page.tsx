@@ -24,6 +24,9 @@ import { toEmbedUrl } from "@/lib/videoEmbed";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import QuizForm from "@/components/quiz/QuizForm";
 import TextLessonContent from "@/components/lessons/TextLessonContent";
+import LessonFeedback from "@/components/learn/LessonFeedback";
+import TutorPanel from "@/components/tutor/TutorPanel";
+import LabPanel from "@/components/labs/LabPanel";
 
 export default function LessonPage() {
   const params = useParams();
@@ -54,6 +57,11 @@ export default function LessonPage() {
   const [quizCompleted, setQuizCompleted] = useState(false);
 
   const allLessonIds = Object.values(lessonMap).flat().map((l) => l.id);
+  // Module containing the current lesson (needed by the AI tutor/lab panels)
+  const currentModuleId =
+    Object.keys(lessonMap).find((mid) =>
+      lessonMap[mid].some((l) => l.id === lessonId)
+    ) ?? null;
 
   const load = useCallback(async () => {
     if (!appUser) return;
@@ -502,6 +510,31 @@ export default function LessonPage() {
               </p>
             </div>
           )}
+
+          {/* AI lab grading — lab lessons only */}
+          {lesson.type === "lab" && currentModuleId && (
+            <div className="mt-8">
+              <LabPanel
+                courseId={courseId}
+                moduleId={currentModuleId}
+                lessonId={lessonId}
+              />
+            </div>
+          )}
+
+          {/* AI tutor — available on every lesson */}
+          <div className="mt-8">
+            <TutorPanel
+              courseId={courseId}
+              moduleId={currentModuleId ?? undefined}
+              lessonId={lessonId}
+            />
+          </div>
+
+          {/* Lesson feedback — shown for every lesson type, below the content */}
+          <div className="mt-10">
+            <LessonFeedback lessonId={lessonId} courseId={courseId} />
+          </div>
         </main>
       </div>
     </LearnerShell>

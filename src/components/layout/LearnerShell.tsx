@@ -24,6 +24,12 @@ export default function LearnerShell({ children }: { children: React.ReactNode }
           Andela <span className="text-white font-light">LMS</span>
         </Link>
         <div className="flex items-center gap-3">
+          <Link
+            href="/learn/review"
+            className="text-xs text-white/70 hover:text-white transition-colors"
+          >
+            Review
+          </Link>
           <span className="text-xs text-white/50 hidden sm:block truncate max-w-[160px]">
             {appUser?.name || ""}
           </span>

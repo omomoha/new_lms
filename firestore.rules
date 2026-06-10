@@ -137,10 +137,62 @@ service cloud.firestore {
     match /progress/{progressId} {
       // Learner can read/write their own progress docs.
       // progressId format: "{userId}_{lessonId}"
+      // READ is field-based (resource.data.userId) so list queries filtered by
+      // userId == request.auth.uid are provable (needed by the streak card —
+      // a doc-ID prefix rule denies ALL list queries). Single-doc gets still
+      // work because every progress write stamps userId (enforced below).
       allow read: if isAdmin()
-        || (isAuthed() && progressId.matches(request.auth.uid + "_.*"));
+        || (isAuthed() && resource.data.userId == request.auth.uid);
       allow write: if isAdmin()
-        || (isAuthed() && progressId.matches(request.auth.uid + "_.*"));
+        || (isAuthed()
+            && progressId.matches(request.auth.uid + "_.*")
+            && request.resource.data.userId == request.auth.uid);
+    }
+
+    // ── lessonFeedback/{uid_lessonId} ───────────────────────────────────────
+    // "Was this lesson helpful?" ratings. Learner writes their own doc;
+    // admins can read everything for content analytics.
+    match /lessonFeedback/{feedbackId} {
+      allow read: if isAdmin()
+        || (isAuthed() && resource.data.userId == request.auth.uid);
+      allow write: if isAuthed()
+        && feedbackId.matches(request.auth.uid + "_.+")
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() <= 1000;
+    }
+
+    // ── labGrades/{uid_lessonId} ────────────────────────────────────────────
+    // AI lab grades — written ONLY by the gradeLab function (admin SDK), so
+    // learners cannot forge scores. Learner reads their own; admins all.
+    match /labGrades/{gradeId} {
+      allow read: if isAdmin()
+        || (isAuthed() && resource.data.userId == request.auth.uid);
+      allow write: if false; // gradeLab function only
+    }
+
+    // ── flashcards/{cardId} ─────────────────────────────────────────────────
+    // Spaced-repetition cards. Created/deleted ONLY by the generateFlashcards
+    // function (admin SDK). The owner may read them and update ONLY the
+    // scheduling fields (interval/ease/reps/due) during review — card content
+    // and ownership are immutable from the client.
+    match /flashcards/{cardId} {
+      allow read: if isAdmin()
+        || (isAuthed() && resource.data.userId == request.auth.uid);
+      allow update: if isAuthed()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(["interval", "ease", "reps", "due"]);
+      allow create, delete: if false; // generateFlashcards function only
+    }
+
+    // ── aiUsage/{uid} ───────────────────────────────────────────────────────
+    // Per-user AI rate-limit buckets — server-side only.
+    match /aiUsage/{uid} {
+      allow read, write: if false; // admin SDK only
     }
 
     // ── mail/{id} ───────────────────────────────────────────────────────────

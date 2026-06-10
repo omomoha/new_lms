@@ -10,14 +10,25 @@ import LearnerShell from "@/components/layout/LearnerShell";
 import { Spinner } from "@/components/ui/Spinner";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { EntityThumb } from "@/components/ui/Thumb";
+import ResumeCard from "@/components/learn/ResumeCard";
+import CourseSearch from "@/components/learn/CourseSearch";
+import StreakCard from "@/components/learn/StreakCard";
+import { pickResumeCourse } from "@/lib/resume";
+import { filterCourses } from "@/lib/search";
 
-type CourseWithAccess = Course & { progressPct: number; hasAccess: boolean };
+type CourseWithAccess = Course & {
+  progressPct: number;
+  hasAccess: boolean;
+  updatedAtMillis: number | null;
+  lastLessonId: string | null;
+};
 
 export default function LearnDashboard() {
   const { appUser } = useAuth();
   const [courses, setCourses] = useState<CourseWithAccess[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (!appUser) return;
@@ -61,15 +72,21 @@ export default function LearnDashboard() {
               (c.assignedCohortIds ?? []).some((id) => userCohortIds.includes(id));
 
             let progressPct = 0;
+            let updatedAtMillis: number | null = null;
+            let lastLessonId: string | null = null;
             if (hasAccess) {
               const enrollId = `${appUser.uid}_${c.id}`;
               const enrollSnap = await getDoc(doc(db, "enrollments", enrollId));
               if (enrollSnap.exists()) {
-                progressPct = (enrollSnap.data() as Enrollment).progressPct ?? 0;
+                const enrollment = enrollSnap.data() as Enrollment;
+                progressPct = enrollment.progressPct ?? 0;
+                lastLessonId = enrollment.lastLessonId ?? null;
+                // updatedAt may be missing on legacy docs — guard the call
+                updatedAtMillis = enrollment.updatedAt?.toMillis?.() ?? null;
               }
             }
 
-            return { ...c, progressPct, hasAccess };
+            return { ...c, progressPct, hasAccess, updatedAtMillis, lastLessonId };
           })
         );
 
@@ -90,6 +107,14 @@ export default function LearnDashboard() {
       }
     })();
   }, [appUser]);
+
+  // Resume CTA: most recently touched in-progress course (pure selection
+  // logic lives in src/lib/resume.ts)
+  const resume = pickResumeCourse(courses);
+
+  // Search: case/diacritic-insensitive filter over title + description
+  const visibleCourses = filterCourses(courses, searchQuery);
+  const isSearching = searchQuery.trim().length > 0;
 
   return (
     <LearnerShell>
@@ -117,8 +142,38 @@ export default function LearnDashboard() {
             <p>No published courses available yet. Check back soon.</p>
           </div>
         ) : (
+          <>
+            {/* Streak + weekly goal */}
+            {appUser && <StreakCard uid={appUser.uid} />}
+
+            {/* Resume CTA — most recently touched in-progress course */}
+            {resume && (
+              <ResumeCard
+                courseId={resume.course.id}
+                title={resume.course.title}
+                description={resume.course.description}
+                thumbPath={resume.course.thumbPath}
+                progressPct={resume.course.progressPct}
+                basis={resume.basis}
+              />
+            )}
+
+            {/* Course search */}
+            <CourseSearch onQueryChange={setSearchQuery} />
+            <p aria-live="polite" className={isSearching ? "mb-3 text-xs text-brand-muted" : "sr-only"}>
+              {isSearching
+                ? `${visibleCourses.length} course${visibleCourses.length !== 1 ? "s" : ""} matching "${searchQuery.trim()}"`
+                : ""}
+            </p>
+
+            {visibleCourses.length === 0 ? (
+              <div className="text-center py-16 text-brand-muted">
+                <div className="mx-auto w-8 h-8 rounded-sm rotate-45 mb-4 bg-brand-mint" />
+                <p className="text-sm">No courses match your search. Try a different term.</p>
+              </div>
+            ) : (
           <div className="grid gap-4 sm:grid-cols-2">
-            {courses.map((c) =>
+            {visibleCourses.map((c) =>
               c.hasAccess ? (
                 <Link
                   key={c.id}
@@ -193,6 +248,8 @@ export default function LearnDashboard() {
               )
             )}
           </div>
+            )}
+          </>
         )}
       </div>
     </LearnerShell>

@@ -290,3 +290,20 @@ To activate:
 3. Set the collection to `mail`.
 
 No code changes are needed — the `bulkOnboard` function already writes the correct format.
+
+## AI features setup
+
+The AI tutor, quiz generation, lab grading, flashcards and admin copilot are
+powered by the Claude API. They are **disabled gracefully** until you set:
+
+```
+# functions runtime env (e.g. functions/.env or Cloud Console)
+ANTHROPIC_API_KEY=sk-ant-...
+AI_MODEL=claude-sonnet-4-6   # optional override
+```
+
+Without a key, the callables return `failed-precondition` and the UI shows a
+friendly "not configured" message. All AI endpoints are rate-limited per user
+(aiUsage collection), require auth + course access (or admin), fence all
+user/lesson content against prompt injection, and validate model JSON output
+before it is stored or returned.

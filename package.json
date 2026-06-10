@@ -8,12 +8,13 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run tests/csvParser.test.ts tests/progress.test.ts tests/roleGuard.test.ts",
+    "test": "vitest run tests/csvParser.test.ts tests/progress.test.ts tests/roleGuard.test.ts tests/resume.test.ts tests/search.test.ts tests/streaks.test.ts tests/quizSchema.test.ts tests/spacedRepetition.test.ts tests/labRubric.test.ts",
     "test:rules": "vitest run tests/firestore.rules.test.ts"
   },
   "dependencies": {
     "dompurify": "^3.4.8",
     "firebase": "^10.12.2",
+    "highlight.js": "^11.10.0",
     "isomorphic-dompurify": "^3.15.0",
     "jose": "^6.2.3",
     "mammoth": "^1.12.0",

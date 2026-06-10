@@ -21,6 +21,7 @@ import React, {
   useMemo,
 } from "react";
 import DOMPurify from "isomorphic-dompurify";
+import { highlightCode } from "@/lib/highlight";
 
 // Raw-HTML lessons may carry <a target="_blank"> without rel — force
 // noopener/noreferrer on every link that opens a new browsing context
@@ -322,11 +323,23 @@ function CodeBlock({ html, lang }: CodeBlockProps) {
   const [codeText, setCodeText] = useState("");
 
   useEffect(() => {
-    if (ref.current) {
-      const codeEl = ref.current.querySelector("code");
-      setCodeText(codeEl?.textContent ?? "");
+    const codeEl = ref.current?.querySelector("code");
+    if (!codeEl) return;
+    // textContent decodes the escaped entities back to PLAIN TEXT — this is
+    // the only thing we ever hand to highlight.js.
+    const text = codeEl.textContent ?? "";
+    setCodeText(text);
+    if (!text.trim()) return;
+    // SECURITY: hljs.highlight() HTML-escapes its plain-text input itself,
+    // so injecting its output (escaped code + token spans) is safe. We never
+    // pass pre-rendered HTML to it. React only resets this innerHTML when the
+    // `html` prop changes — and this effect re-runs then, re-highlighting.
+    const { html: highlighted } = highlightCode(text, lang);
+    if (highlighted) {
+      codeEl.innerHTML = highlighted;
+      codeEl.classList.add("hljs");
     }
-  }, [html]);
+  }, [html, lang]);
 
   return (
     <div style={{ position: "relative", margin: "1.25rem 0" }}>
@@ -700,6 +713,66 @@ export default function TextLessonContent({ content }: TextLessonContentProps) {
           padding: 0;
           font-size: inherit;
           border-radius: 0;
+        }
+        /* highlight.js token theme — scoped to dark code blocks only
+           (atom-one-dark-inspired palette, tuned for the #0C2C28 background) */
+        .tl-code-block .hljs-comment,
+        .tl-code-block .hljs-quote {
+          color: #7E9A8C;
+          font-style: italic;
+        }
+        .tl-code-block .hljs-keyword,
+        .tl-code-block .hljs-selector-tag,
+        .tl-code-block .hljs-doctag,
+        .tl-code-block .hljs-formula {
+          color: #C678DD;
+        }
+        .tl-code-block .hljs-string,
+        .tl-code-block .hljs-regexp,
+        .tl-code-block .hljs-addition,
+        .tl-code-block .hljs-attribute,
+        .tl-code-block .hljs-meta .hljs-string {
+          color: #98C379;
+        }
+        .tl-code-block .hljs-number,
+        .tl-code-block .hljs-literal,
+        .tl-code-block .hljs-attr,
+        .tl-code-block .hljs-template-variable,
+        .tl-code-block .hljs-selector-attr,
+        .tl-code-block .hljs-selector-pseudo {
+          color: #D19A66;
+        }
+        .tl-code-block .hljs-title,
+        .tl-code-block .hljs-title.function_,
+        .tl-code-block .hljs-section {
+          color: #61AFEF;
+        }
+        .tl-code-block .hljs-title.class_,
+        .tl-code-block .hljs-type,
+        .tl-code-block .hljs-built_in,
+        .tl-code-block .hljs-class .hljs-title {
+          color: #E5C07B;
+        }
+        .tl-code-block .hljs-variable,
+        .tl-code-block .hljs-name,
+        .tl-code-block .hljs-tag,
+        .tl-code-block .hljs-deletion,
+        .tl-code-block .hljs-selector-id,
+        .tl-code-block .hljs-selector-class {
+          color: #E06C75;
+        }
+        .tl-code-block .hljs-operator,
+        .tl-code-block .hljs-symbol,
+        .tl-code-block .hljs-bullet,
+        .tl-code-block .hljs-link,
+        .tl-code-block .hljs-meta {
+          color: #56B6C2;
+        }
+        .tl-code-block .hljs-emphasis {
+          font-style: italic;
+        }
+        .tl-code-block .hljs-strong {
+          font-weight: 700;
         }
         .tl-section {
           margin-bottom: 0.25rem;
