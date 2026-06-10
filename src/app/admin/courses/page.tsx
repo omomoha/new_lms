@@ -85,12 +85,20 @@ export default function AdminCoursesPage() {
             Build and publish courses, manage modules and lessons.
           </p>
         </div>
-        <button
-          className="self-start sm:self-auto flex-shrink-0 px-4 py-2 rounded-lg font-semibold text-sm transition-colors bg-brand-accent text-brand-primary"
-          onClick={() => setShowForm((v) => !v)}
-        >
-          {showForm ? "Cancel" : "+ New Course"}
-        </button>
+        <div className="flex gap-2 self-start sm:self-auto flex-shrink-0">
+          <Link
+            href="/admin/courses/builder"
+            className="px-4 py-2 rounded-lg font-semibold text-sm transition-colors border border-brand-accent text-brand-mint hover:bg-brand-accent hover:text-brand-primary"
+          >
+            ✨ Generate with AI
+          </Link>
+          <button
+            className="px-4 py-2 rounded-lg font-semibold text-sm transition-colors bg-brand-accent text-brand-primary"
+            onClick={() => setShowForm((v) => !v)}
+          >
+            {showForm ? "Cancel" : "+ New Course"}
+          </button>
+        </div>
       </div>
 
       {/* Create form */}

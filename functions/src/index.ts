@@ -22,6 +22,7 @@ export {
 // ── AI features (require ANTHROPIC_API_KEY in the runtime env) ──────────────
 export { askTutor } from "./aiTutor";
 export { generateAssessment } from "./generateAssessment";
+export { generateCourseOutline } from "./generateCourseOutline";
 export { gradeLab } from "./gradeLab";
 export { generateFlashcards } from "./flashcardsGen";
 export { adminCopilot } from "./adminCopilot";
