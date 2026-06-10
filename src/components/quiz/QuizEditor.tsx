@@ -31,6 +31,7 @@ import { doc, setDoc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import db from "@/lib/firebase/firestore";
 import functions from "@/lib/firebase/functions";
+import { extractTextFromFile, ExtractError } from "@/lib/extractClientText";
 import type { Assessment, AssessmentKind, AssessmentQuestion } from "@/types";
 
 interface QuizEditorProps {
@@ -157,6 +158,32 @@ export default function QuizEditor({
   const [showGenPanel, setShowGenPanel] = useState(false);
   const [genNumQuestions, setGenNumQuestions] = useState(5);
   const [genSourceText, setGenSourceText] = useState("");
+  const [extracting, setExtracting] = useState(false);
+  const [extractedFrom, setExtractedFrom] = useState<string | null>(null);
+  const sourceFileRef = useRef<HTMLInputElement>(null);
+
+  const handleSourceFile = async (file: File | null) => {
+    if (!file) return;
+    setGenError(null);
+    setExtracting(true);
+    try {
+      let text = await extractTextFromFile(file);
+      const truncated = text.length > 30000;
+      if (truncated) text = text.slice(0, 30000);
+      setGenSourceText(text);
+      setExtractedFrom(
+        `${file.name}${truncated ? " (truncated to 30,000 characters)" : ""}`
+      );
+    } catch (err: unknown) {
+      setExtractedFrom(null);
+      setGenError(
+        err instanceof ExtractError ? err.message : "Could not read that file."
+      );
+    } finally {
+      setExtracting(false);
+      if (sourceFileRef.current) sourceFileRef.current.value = "";
+    }
+  };
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   // Generated questions waiting on a Replace/Append decision
@@ -479,12 +506,33 @@ export default function QuizEditor({
             and edit the drafted questions before saving.
           </p>
           <div>
-            <label
-              htmlFor="gen-source-text"
-              className="block font-medium text-brand-muted mb-1"
-            >
-              Learning content (optional)
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label
+                htmlFor="gen-source-text"
+                className="block font-medium text-brand-muted"
+              >
+                Learning content (optional)
+              </label>
+              <button
+                type="button"
+                className="btn-secondary text-xs !py-1"
+                disabled={generating || extracting}
+                onClick={() => sourceFileRef.current?.click()}
+              >
+                {extracting ? "Reading file…" : "⬆ Upload document (PDF / DOCX / TXT)"}
+              </button>
+              <input
+                ref={sourceFileRef}
+                type="file"
+                accept=".pdf,.docx,.txt,.md,.markdown"
+                className="hidden"
+                aria-label="Upload learning content document"
+                onChange={(e) => void handleSourceFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
+            {extractedFrom && (
+              <p className="text-brand-teal mb-1">Loaded from {extractedFrom} — review below, then generate.</p>
+            )}
             <textarea
               id="gen-source-text"
               className="input-field text-xs resize-y font-mono"
