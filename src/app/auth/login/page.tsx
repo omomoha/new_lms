@@ -85,6 +85,13 @@ function LoginForm() {
       await signIn(email, password);
       router.replace(next || "/");
     } catch (err: unknown) {
+      const raw = err instanceof Error ? err.message : "";
+      if (raw === "EMAIL_NOT_VERIFIED") {
+        setError(
+          "Please verify your email first — we just sent you a fresh verification link. Click it, then sign in."
+        );
+        return;
+      }
       const msg = err instanceof Error ? err.message : "Login failed";
       setError(
         msg.includes("wrong-password") || msg.includes("user-not-found")

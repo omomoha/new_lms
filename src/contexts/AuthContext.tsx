@@ -29,6 +29,7 @@ import {
   signOut as firebaseSignOut,
   createUserWithEmailAndPassword,
   updateProfile,
+  sendEmailVerification,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import getClientAuth from "@/lib/firebase/auth";
@@ -129,9 +130,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
+  // Email verification is enforced only for accounts created AFTER this
+  // date (when the feature shipped). Older accounts are grandfathered:
+  // bulk-onboarded learners proved inbox ownership via their set-password
+  // link, and pre-existing accounts would otherwise be locked out.
+  const VERIFICATION_ENFORCED_FROM = new Date("2026-06-11T00:00:00Z");
+
   const signIn = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(getClientAuth(), email, password);
-    // onAuthStateChanged above will update state automatically
+    const cred = await signInWithEmailAndPassword(getClientAuth(), email, password);
+    const u = cred.user;
+    const createdAt = u.metadata.creationTime ? new Date(u.metadata.creationTime) : null;
+    const mustVerify =
+      !u.emailVerified && createdAt !== null && createdAt >= VERIFICATION_ENFORCED_FROM;
+    if (mustVerify) {
+      // Re-send a fresh link (best effort), then refuse the session.
+      await sendEmailVerification(u).catch(() => undefined);
+      await firebaseSignOut(getClientAuth());
+      throw new Error("EMAIL_NOT_VERIFIED");
+    }
+    // onIdTokenChanged above will update state automatically
   };
 
   // Self-service signup. Creates the Auth user AND the users/{uid} profile doc
@@ -149,7 +166,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status: "active",
       createdAt: serverTimestamp(),
     });
-    // onAuthStateChanged picks up the new doc and routes the user.
+    // Firebase's built-in transactional email (same system as password
+    // resets — templates under Console → Authentication → Templates).
+    await sendEmailVerification(cred.user).catch(() => undefined);
+    // No session until the address is verified: sign straight out. The
+    // register page shows the "check your inbox" state.
+    await firebaseSignOut(getClientAuth());
   };
 
   const signOut = async () => {

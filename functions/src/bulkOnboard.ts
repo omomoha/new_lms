@@ -149,7 +149,11 @@ export const bulkOnboard = onCall(
             email,
             displayName: name,
             password: tempPassword,
-            emailVerified: false,
+            // The set-password link is delivered to this inbox and must be
+            // used before first login — clicking it proves ownership, so the
+            // address counts as verified (sign-in enforces verification for
+            // self-signups created after 2026-06-11).
+            emailVerified: true,
           });
           uid = userRecord.uid;
         } catch (err: unknown) {

@@ -1,19 +1,18 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function RegisterPage() {
   const { register } = useAuth();
-  const router = useRouter();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [verifySent, setVerifySent] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -33,7 +32,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await register(name.trim(), email.trim(), password);
-      router.replace("/");
+      setVerifySent(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Registration failed";
       setError(
@@ -58,6 +57,21 @@ export default function RegisterPage() {
         <p className="text-sm" style={{ color: "rgba(255,255,255,0.5)" }}>Create your account</p>
       </div>
 
+      {verifySent ? (
+        <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6 sm:p-8 text-center">
+          <div className="text-4xl mb-3" aria-hidden="true">📬</div>
+          <h1 className="font-serif-brand text-xl font-normal mb-2 text-brand-primary">
+            Verify your email
+          </h1>
+          <p className="text-sm text-brand-muted mb-4">
+            We sent a verification link to <b className="text-brand-ink">{email.trim()}</b>.
+            Click it, then sign in. (Check spam if it doesn&apos;t arrive in a minute.)
+          </p>
+          <Link href="/auth/login" className="btn-primary w-full py-2.5 inline-flex">
+            Go to sign in
+          </Link>
+        </div>
+      ) : (
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6 sm:p-8">
         <h1 className="font-serif-brand text-xl font-normal mb-6 text-brand-primary">Sign up</h1>
 
@@ -93,6 +107,7 @@ export default function RegisterPage() {
           <Link href="/auth/login" className="font-semibold hover:underline text-brand-accent">Sign in</Link>
         </p>
       </div>
+      )}
     </div>
   );
 }
