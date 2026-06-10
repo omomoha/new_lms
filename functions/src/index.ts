@@ -28,5 +28,7 @@ export { gradeLab } from "./gradeLab";
 export { generateFlashcards } from "./flashcardsGen";
 export { adminCopilot } from "./adminCopilot";
 
+export { getCohortLeaderboard } from "./leaderboard";
+
 // ── Retention ────────────────────────────────────────────────────────────────
 export { learnerReminders } from "./learnerReminders";
