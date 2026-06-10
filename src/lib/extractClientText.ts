@@ -20,6 +20,56 @@ function extension(name: string): string {
   return dot === -1 ? "" : name.slice(dot + 1).toLowerCase();
 }
 
+interface PdfTextItem {
+  str: string;
+  /** [a, b, c, d, x, y] text matrix — x/y give the item's position in pt */
+  transform: number[];
+  width: number;
+  height: number;
+}
+
+/**
+ * Assemble page text POSITION-AWARE. Many PDFs emit each glyph run as a
+ * separate text item; naively joining items with spaces shatters words
+ * ("F eedback C heck"). Instead: insert a newline when the baseline (y)
+ * moves, a space only when there is a real horizontal gap between items,
+ * and otherwise concatenate runs directly.
+ */
+function assemblePageText(items: PdfTextItem[]): string {
+  let out = "";
+  let lastY: number | null = null;
+  let lastEndX: number | null = null;
+  let lastHeight = 10;
+
+  for (const item of items) {
+    if (!item.str) continue;
+    const x = item.transform[4];
+    const y = item.transform[5];
+    const height = item.height || lastHeight;
+
+    if (lastY !== null && Math.abs(y - lastY) > height * 0.5) {
+      out += "\n";
+    } else if (
+      lastEndX !== null &&
+      out.length > 0 &&
+      !out.endsWith(" ") &&
+      !out.endsWith("\n") &&
+      !item.str.startsWith(" ") &&
+      // real word gap ≈ at least a fifth of the line height; glyph-run
+      // continuations inside a word have ~zero gap
+      x - lastEndX > Math.max(1, height * 0.2)
+    ) {
+      out += " ";
+    }
+
+    out += item.str;
+    lastEndX = x + (item.width || 0);
+    lastY = y;
+    lastHeight = height;
+  }
+  return out;
+}
+
 async function pdfToText(buf: ArrayBuffer): Promise<string> {
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc =
@@ -31,9 +81,9 @@ async function pdfToText(buf: ArrayBuffer): Promise<string> {
       const page = await doc.getPage(i);
       const content = await page.getTextContent();
       parts.push(
-        content.items
-          .map((it) => ("str" in it ? (it as { str: string }).str : ""))
-          .join(" ")
+        assemblePageText(
+          content.items.filter((it): it is PdfTextItem => "str" in it)
+        )
       );
     }
     return parts.join("\n\n");
