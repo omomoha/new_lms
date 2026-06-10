@@ -1,9 +1,14 @@
 {
   "hosting": {
     "source": ".",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
     "frameworksBackend": {
-      "region": "us-central1"
+      "region": "us-central1",
+      "minInstances": 1
     }
   },
   "firestore": {
@@ -17,7 +22,10 @@
     {
       "source": "functions",
       "codebase": "default",
-      "predeploy": ["npm --prefix \"$RESOURCE_DIR\" install", "npm --prefix \"$RESOURCE_DIR\" run build"],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" install",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ],
       "ignore": [
         "node_modules",
         ".git",
@@ -28,12 +36,25 @@
     }
   ],
   "emulators": {
-    "auth": { "port": 9099 },
-    "functions": { "port": 5001 },
-    "firestore": { "port": 8080 },
-    "storage": { "port": 9199 },
-    "hosting": { "port": 5000 },
-    "ui": { "enabled": true, "port": 4000 },
+    "auth": {
+      "port": 9099
+    },
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "storage": {
+      "port": 9199
+    },
+    "hosting": {
+      "port": 5000
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    },
     "singleProjectMode": true
   }
 }

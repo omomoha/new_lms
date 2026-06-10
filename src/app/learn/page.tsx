@@ -91,34 +91,36 @@ export default function LearnDashboard() {
           dueDateCohorts = [];
         }
 
-        // Fetch enrollments for progress (only matters for accessible courses)
-        const withAccessAndProgress = await Promise.all(
-          allPublished.map(async (c) => {
-            const hasAccess =
-              (c.assignedCohortIds ?? []).some((id) => userCohortIds.includes(id));
-
-            let progressPct = 0;
-            let updatedAtMillis: number | null = null;
-            let lastLessonId: string | null = null;
-            if (hasAccess) {
-              const enrollId = `${appUser.uid}_${c.id}`;
-              const enrollSnap = await getDoc(doc(db, "enrollments", enrollId));
-              if (enrollSnap.exists()) {
-                const enrollment = enrollSnap.data() as Enrollment;
-                progressPct = enrollment.progressPct ?? 0;
-                lastLessonId = enrollment.lastLessonId ?? null;
-                // updatedAt may be missing on legacy docs — guard the call
-                updatedAtMillis = enrollment.updatedAt?.toMillis?.() ?? null;
-              }
-            }
-
-            const dueMillis = hasAccess
-              ? resolveDueDate(c.id, dueDateCohorts)
-              : null;
-
-            return { ...c, progressPct, hasAccess, updatedAtMillis, lastLessonId, dueMillis };
-          })
+        // Page-load perf: ONE query for all of the user's enrollments instead
+        // of a getDoc round-trip per course (the rules' field-based read
+        // branch makes this list query provable).
+        const enrollSnap = await getDocs(
+          query(collection(db, "enrollments"), where("userId", "==", appUser.uid))
         );
+        const enrollByCourse = new Map<string, Enrollment>();
+        enrollSnap.docs.forEach((d) => {
+          const e = d.data() as Enrollment;
+          if (e.courseId) enrollByCourse.set(e.courseId, e);
+        });
+
+        const withAccessAndProgress = allPublished.map((c) => {
+          const hasAccess =
+            (c.assignedCohortIds ?? []).some((id) => userCohortIds.includes(id));
+          const enrollment = hasAccess ? enrollByCourse.get(c.id) : undefined;
+          const dueMillis = hasAccess
+            ? resolveDueDate(c.id, dueDateCohorts)
+            : null;
+
+          return {
+            ...c,
+            progressPct: enrollment?.progressPct ?? 0,
+            hasAccess,
+            // updatedAt may be missing on legacy docs — guard the call
+            updatedAtMillis: enrollment?.updatedAt?.toMillis?.() ?? null,
+            lastLessonId: enrollment?.lastLessonId ?? null,
+            dueMillis,
+          };
+        });
 
         // Sort: accessible first, then locked
         withAccessAndProgress.sort((a, b) => {

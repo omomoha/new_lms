@@ -118,8 +118,15 @@ service cloud.firestore {
     // assigned to one of their cohorts (verified via get() on the course doc).
     // enrollmentId format: "{userId}_{courseId}"
     match /enrollments/{enrollmentId} {
+      // Read accepts EITHER form (same pattern as progress): the doc-ID
+      // prefix covers single gets including not-yet-created enrollments;
+      // the field branch makes userId == uid LIST queries provable so the
+      // dashboard can load all enrollments in ONE query instead of one
+      // get per course (page-load perf).
       allow read: if isAdmin()
-        || (isAuthed() && enrollmentId.matches(request.auth.uid + "_.*"));
+        || (isAuthed()
+            && (enrollmentId.matches(request.auth.uid + "_.*")
+                || resource.data.userId == request.auth.uid));
 
       // Fix #16: write requires own doc AND cohort assignment check.
       // courseId is everything after "{uid}_" — split on the literal uid prefix
