@@ -373,6 +373,17 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── analytics/{id} (Phase 4 — Workstream D) ─────────────────────────────
+    // Pre-aggregated leadership metrics (analytics/overview,
+    // analytics/course_{id}, analytics/cohort_{id}). Written ONLY by the
+    // analyticsAggregation scheduled function via the admin SDK; readable by
+    // admins only (the dashboard is admin-gated). No client writes — metrics
+    // must never be forgeable.
+    match /analytics/{docId} {
+      allow read: if isAdmin();
+      allow write: if false; // analyticsAggregation function only via admin SDK
+    }
+
     // ── Community Forum (Phase 4 — Workstream B) ─────────────────────────────
     // Standalone cross-cohort discussion space. Modeled on the discussions +
     // notifications blocks above.

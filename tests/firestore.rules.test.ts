@@ -168,6 +168,16 @@ beforeAll(async () => {
     await setDoc(doc(db, "settings", "features"), {
       communityForum: true,
       tutorEnhancements: false,
+      analyticsDashboard: true,
+    });
+    // analytics/ pre-aggregated docs (admin-read only, server-write only).
+    await setDoc(doc(db, "analytics", "overview"), {
+      totals: { learners: 3 },
+      completion: { completionPct: 42 },
+    });
+    await setDoc(doc(db, "analytics", "course_course-mine"), {
+      title: "My Course",
+      completionPct: 50,
     });
   });
 });
@@ -797,6 +807,46 @@ describe("forum reports", () => {
       updateDoc(doc(admin.firestore(), "forumReports", "report-1"), {
         resolved: true,
       })
+    );
+  });
+});
+
+// ── analytics/ (Phase 4 — Workstream D) ─────────────────────────────────────
+// Pre-aggregated leadership metrics: admin-read only, server-write only.
+describe("analytics aggregates", () => {
+  it("allows an admin to read the overview doc", async () => {
+    const admin = testEnv.authenticatedContext("admin-uid", { role: "admin" });
+    await assertSucceeds(getDoc(doc(admin.firestore(), "analytics", "overview")));
+  });
+
+  it("allows an admin to read a per-course aggregate", async () => {
+    const admin = testEnv.authenticatedContext("admin-uid", { role: "admin" });
+    await assertSucceeds(
+      getDoc(doc(admin.firestore(), "analytics", "course_course-mine"))
+    );
+  });
+
+  it("denies a learner reading analytics docs", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertFails(getDoc(doc(learner.firestore(), "analytics", "overview")));
+  });
+
+  it("denies an unauthenticated user reading analytics docs", async () => {
+    const unauthed = testEnv.unauthenticatedContext();
+    await assertFails(getDoc(doc(unauthed.firestore(), "analytics", "overview")));
+  });
+
+  it("denies an admin writing analytics docs (server-side only)", async () => {
+    const admin = testEnv.authenticatedContext("admin-uid", { role: "admin" });
+    await assertFails(
+      setDoc(doc(admin.firestore(), "analytics", "overview"), { totals: { learners: 9 } })
+    );
+  });
+
+  it("denies a learner writing analytics docs", async () => {
+    const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    await assertFails(
+      setDoc(doc(learner.firestore(), "analytics", "course_course-mine"), { completionPct: 1 })
     );
   });
 });

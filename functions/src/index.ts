@@ -34,6 +34,12 @@ export { manageUserAccount } from "./manageUsers";
 // ── Retention ────────────────────────────────────────────────────────────────
 export { learnerReminders } from "./learnerReminders";
 
+// ── Analytics (Phase 4 — Workstream D) ─────────────────────────────────────────
+// Hourly scheduled rollup into the admin-only `analytics/` collection so the
+// /admin/analytics dashboard reads pre-computed docs instead of scanning
+// enrollments/progress/attempts/tutorConversations live at 5k learners.
+export { analyticsAggregation } from "./analyticsAggregation";
+
 // ── Community Forum (Phase 4 — Workstream B) ───────────────────────────────────
 // Reply/thread triggers: notifications (reply + @mention), counter maintenance,
 // and opt-in AI pre-moderation (requires ANTHROPIC_API_KEY only when a category

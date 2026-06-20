@@ -14,7 +14,9 @@ export type FeatureFlag =
   /** Tutor conversation persistence + answer feedback UI (Phase 4 Workstream A). */
   | "tutorEnhancements"
   /** Community forum: categories, threads, replies, moderation (Workstream B). */
-  | "communityForum";
+  | "communityForum"
+  /** Deeper analytics & reporting dashboard (Phase 4 Workstream D). */
+  | "analyticsDashboard";
 
 /** Read a single feature flag; defaults to false on any error / missing key. */
 export async function getFeatureFlag(flag: FeatureFlag): Promise<boolean> {

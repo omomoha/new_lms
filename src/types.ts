@@ -277,3 +277,95 @@ export interface ForumReport {
   resolved: boolean;
   createdAt: Timestamp | null;
 }
+
+// ─── Analytics (Phase 4 — Workstream D) ───────────────────────────────────────
+// Pre-aggregated leadership metrics written hourly by the analyticsAggregation
+// Cloud Function into the admin-only `analytics/` collection. The dashboard
+// reads these pre-computed docs instead of scanning raw collections.
+// Aggregation math lives in functions/src/analyticsRollup.ts (unit-tested).
+
+export type AtRiskReason = "stalled" | "overdue" | "low_scores";
+
+export interface AnalyticsCompletion {
+  enrolled: number;
+  started: number;
+  completed: number;
+  completionPct: number;
+}
+
+export interface AnalyticsTimeOnTask {
+  totalSeconds: number;
+  avgSecondsPerLearner: number;
+  learners: number;
+}
+
+export interface AnalyticsQuiz {
+  attempts: number;
+  passed: number;
+  passRate: number;
+}
+
+export interface AnalyticsAiUsage {
+  conversations: number;
+  learners: number;
+  totalTurns: number;
+  questions: number;
+  answers: number;
+  estInputTokens: number;
+  estOutputTokens: number;
+  estCostUsd: number;
+  feedbackUp: number;
+  feedbackDown: number;
+  satisfactionPct: number;
+}
+
+export interface AnalyticsAtRiskLearner {
+  userId: string;
+  courseId: string;
+  courseTitle: string;
+  cohortId: string | null;
+  cohortName: string | null;
+  progressPct: number;
+  reasons: AtRiskReason[];
+}
+
+/** analytics/course_{courseId} (also embedded in the overview courses[] array). */
+export interface AnalyticsCourse extends AnalyticsCompletion {
+  courseId: string;
+  title: string;
+  avgProgress: number;
+  quizPassRate: number;
+  quizAttempts: number;
+}
+
+/** analytics/cohort_{cohortId} (also embedded in the overview cohorts[] array). */
+export interface AnalyticsCohort extends AnalyticsCompletion {
+  cohortId: string;
+  name: string;
+  avgProgress: number;
+  dau: number;
+  wau: number;
+  atRiskCount: number;
+}
+
+/** analytics/overview — the single doc the dashboard loads first. */
+export interface AnalyticsOverview {
+  generatedAt: Timestamp | null;
+  totals: {
+    learners: number;
+    enrollments: number;
+    courses: number;
+    cohorts: number;
+  };
+  activeLearners: { dau: number; wau: number };
+  completion: AnalyticsCompletion;
+  timeOnTask: AnalyticsTimeOnTask;
+  quiz: AnalyticsQuiz;
+  atRisk: {
+    total: number;
+    learners: AnalyticsAtRiskLearner[];
+  };
+  aiUsage: AnalyticsAiUsage;
+  courses: AnalyticsCourse[];
+  cohorts: AnalyticsCohort[];
+}
