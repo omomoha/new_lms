@@ -76,6 +76,16 @@ service cloud.firestore {
             && request.resource.data.name.size() >= 2
             && request.resource.data.name.size() <= 100);
       allow delete: if isAdmin();
+
+      // ── users/{uid}/tutorConversations/{id} ──────────────────────────────
+      // Phase 4 (Workstream A). AI-tutor chat threads. Learner-private: the
+      // owner reads their own; admins read all for quality review. WRITES are
+      // server-side only (the askTutor callable persists turns via the admin
+      // SDK) so transcripts can't be forged from the client.
+      match /tutorConversations/{conversationId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if false; // askTutor function only via admin SDK
+      }
     }
 
     // ── cohorts/{id} ────────────────────────────────────────────────────────
@@ -185,6 +195,23 @@ service cloud.firestore {
         && request.resource.data.rating <= 5
         && request.resource.data.comment is string
         && request.resource.data.comment.size() <= 1000;
+    }
+
+    // ── tutorFeedback/{uid_conversationId_turnIndex} ────────────────────────
+    // Phase 4 (Workstream A). Thumbs up/down (+ optional reason) on a tutor
+    // answer. The learner creates/overwrites their OWN feedback; admins read
+    // everything for quality analytics. Doc-ID prefix must be the caller's uid.
+    match /tutorFeedback/{feedbackId} {
+      allow read: if isAdmin()
+        || (isAuthed()
+            && (feedbackId.matches(request.auth.uid + "_.+")
+                || resource.data.userId == request.auth.uid));
+      allow write: if isAuthed()
+        && feedbackId.matches(request.auth.uid + "_.+")
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.rating in ["up", "down"]
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() <= 1000;
     }
 
     // ── labGrades/{uid_lessonId} ────────────────────────────────────────────

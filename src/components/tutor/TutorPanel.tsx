@@ -4,16 +4,29 @@
  * TutorPanel — collapsible "Ask the AI tutor" chat panel for the learner UI.
  *
  * Calls the `askTutor` callable with the current course/module/lesson context
- * plus the last 8 conversation turns. Tutor answers are rendered as PLAIN
- * TEXT (whitespace-pre-wrap) — never as HTML — so model output can't inject
- * markup. Errors from the callable (quota, not-configured, …) are shown
- * inline. Fully keyboard accessible: Enter sends, Shift+Enter adds a newline,
- * the toggle and starter chips are real buttons.
+ * plus the last 8 conversation turns.
+ *
+ * RENDERING: assistant turns are rendered from Markdown via a STRICT pipeline —
+ * markdownToHtml() escapes everything and emits only an allow-list of structural
+ * tags, then DOMPurify sanitizes again before the HTML touches the DOM (see
+ * src/lib/tutorMarkdown.ts). Model output therefore can never inject live
+ * markup. User turns stay plain text (whitespace-pre-wrap).
+ *
+ * ENHANCEMENTS (persistence + feedback) are gated behind the `tutorEnhancements`
+ * feature flag so a prod deploy of in-progress work stays safe. With the flag
+ * OFF the panel behaves exactly as before (markdown rendering aside).
+ *
+ * Fully keyboard accessible: Enter sends, Shift+Enter adds a newline; the
+ * toggle, starter chips, and feedback controls are real buttons.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { httpsCallable } from "firebase/functions";
 import functions from "@/lib/firebase/functions";
+import getClientAuth from "@/lib/firebase/auth";
+import { renderTutorMarkdown } from "@/lib/tutorMarkdown";
+import { getFeatureFlag } from "@/lib/featureFlags";
+import { submitTutorFeedback, type FeedbackRating } from "@/lib/tutorConversations";
 
 interface TutorPanelProps {
   courseId: string;
@@ -32,10 +45,12 @@ interface AskTutorRequest {
   lessonId?: string;
   question: string;
   history?: ChatTurn[];
+  conversationId?: string;
 }
 
 interface AskTutorResponse {
   answer: string;
+  conversationId: string;
 }
 
 const MAX_HISTORY_TURNS = 8;
@@ -46,20 +61,69 @@ const STARTER_QUESTIONS = [
   "What should I focus on to pass the assessment?",
 ];
 
+/** Render an assistant turn as sanitized HTML; falls back to plain text. */
+function AssistantMessage({ content }: { content: string }) {
+  const [html, setHtml] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void renderTutorMarkdown(content).then((h) => {
+      if (alive) setHtml(h);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [content]);
+
+  if (html === null) {
+    // Pre-sanitization: never render raw model output as HTML.
+    return <div className="whitespace-pre-wrap">{content}</div>;
+  }
+  return (
+    <div
+      className="tutor-markdown space-y-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-brand-ink/90 [&_pre]:p-3 [&_pre]:text-xs [&_code]:text-[0.85em] [&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-black/10 [&_:not(pre)>code]:px-1"
+      // Sanitized by markdownToHtml (escape-first) + DOMPurify allow-list.
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
 export default function TutorPanel({ courseId, moduleId, lessonId }: TutorPanelProps) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatTurn[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [enhanced, setEnhanced] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  // turnIndex (in `messages`) → submitted rating, to reflect the choice in UI.
+  const [feedback, setFeedback] = useState<Record<number, FeedbackRating>>({});
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Resolve the feature flag once.
+  useEffect(() => {
+    let alive = true;
+    void getFeatureFlag("tutorEnhancements").then((on) => {
+      if (alive) setEnhanced(on);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Keep the latest message in view.
   useEffect(() => {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, loading]);
+
+  const uid = useMemo(() => {
+    try {
+      return getClientAuth().currentUser?.uid ?? null;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const send = async (raw?: string) => {
     const question = (raw ?? input).trim();
@@ -85,11 +149,15 @@ export default function TutorPanel({ courseId, moduleId, lessonId }: TutorPanelP
         ...(lessonId ? { lessonId } : {}),
         question,
         ...(history.length > 0 ? { history } : {}),
+        ...(enhanced && conversationId ? { conversationId } : {}),
       });
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: res.data.answer },
       ]);
+      if (enhanced && res.data.conversationId) {
+        setConversationId(res.data.conversationId);
+      }
     } catch (err: unknown) {
       setError(
         err instanceof Error
@@ -99,6 +167,27 @@ export default function TutorPanel({ courseId, moduleId, lessonId }: TutorPanelP
     } finally {
       setLoading(false);
       inputRef.current?.focus();
+    }
+  };
+
+  const rate = async (turnIndex: number, rating: FeedbackRating) => {
+    if (!enhanced || !uid || !conversationId) return;
+    setFeedback((prev) => ({ ...prev, [turnIndex]: rating }));
+    try {
+      await submitTutorFeedback({
+        uid,
+        conversationId,
+        turnIndex,
+        courseId,
+        rating,
+      });
+    } catch {
+      // Non-fatal: revert the optimistic selection so the learner can retry.
+      setFeedback((prev) => {
+        const next = { ...prev };
+        delete next[turnIndex];
+        return next;
+      });
     }
   };
 
@@ -181,11 +270,38 @@ export default function TutorPanel({ courseId, moduleId, lessonId }: TutorPanelP
                   </div>
                 </div>
               ) : (
-                <div key={i} className="flex justify-start">
-                  {/* Plain text on purpose — never render model markdown as HTML */}
-                  <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-sm bg-brand-mint px-3 py-2 text-sm text-brand-ink">
-                    {m.content}
+                <div key={i} className="flex flex-col items-start gap-1">
+                  <div className="max-w-[85%] rounded-2xl rounded-bl-sm bg-brand-mint px-3 py-2 text-sm text-brand-ink">
+                    <AssistantMessage content={m.content} />
                   </div>
+                  {enhanced && conversationId && (
+                    <div className="flex items-center gap-1 pl-1" aria-label="Rate this answer">
+                      <button
+                        type="button"
+                        onClick={() => void rate(i, "up")}
+                        aria-pressed={feedback[i] === "up"}
+                        aria-label="Helpful"
+                        title="Helpful"
+                        className={`rounded p-1 text-xs hover:bg-brand-mint ${
+                          feedback[i] === "up" ? "text-brand-teal" : "text-brand-muted"
+                        }`}
+                      >
+                        👍
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void rate(i, "down")}
+                        aria-pressed={feedback[i] === "down"}
+                        aria-label="Not helpful"
+                        title="Not helpful"
+                        className={`rounded p-1 text-xs hover:bg-brand-mint ${
+                          feedback[i] === "down" ? "text-red-600" : "text-brand-muted"
+                        }`}
+                      >
+                        👎
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             )}
