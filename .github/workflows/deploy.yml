@@ -1,10 +1,11 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Andela LMS — CI/CD Pipeline
 #
-# Pull requests → quality checks only.
-# Push to main  → checks, then a full `firebase deploy` (Next.js SSR hosting +
-#                 Cloud Functions + Firestore/Storage rules) using the CLI's
-#                 web-frameworks support — the same mechanism as a local deploy.
+# Pull requests           → quality checks only.
+# Push to main / recent_update → checks, then a full `firebase deploy` (Next.js
+#                 SSR hosting + Cloud Functions + Firestore/Storage rules) to the
+#                 production project using the CLI's web-frameworks support — the
+#                 same mechanism as a local deploy.
 #
 # Required GitHub Secrets (Settings → Secrets and variables → Actions):
 #   FIREBASE_SERVICE_ACCOUNT                  — full JSON of a service-account key
@@ -22,7 +23,7 @@ name: Deploy to Firebase
 
 on:
   push:
-    branches: [main]
+    branches: [main, recent_update]
   pull_request:
     branches: [main]
 
@@ -75,7 +76,7 @@ jobs:
   deploy:
     name: Deploy (hosting SSR + functions + rules)
     needs: check
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/recent_update') && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
