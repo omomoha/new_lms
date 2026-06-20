@@ -33,3 +33,9 @@ export { manageUserAccount } from "./manageUsers";
 
 // ── Retention ────────────────────────────────────────────────────────────────
 export { learnerReminders } from "./learnerReminders";
+
+// ── Community Forum (Phase 4 — Workstream B) ───────────────────────────────────
+// Reply/thread triggers: notifications (reply + @mention), counter maintenance,
+// and opt-in AI pre-moderation (requires ANTHROPIC_API_KEY only when a category
+// enables it).
+export { onForumReplyCreated, onForumThreadCreated } from "./forum";

@@ -12,7 +12,9 @@ import db from "@/lib/firebase/firestore";
 
 export type FeatureFlag =
   /** Tutor conversation persistence + answer feedback UI (Phase 4 Workstream A). */
-  | "tutorEnhancements";
+  | "tutorEnhancements"
+  /** Community forum: categories, threads, replies, moderation (Workstream B). */
+  | "communityForum";
 
 /** Read a single feature flag; defaults to false on any error / missing key. */
 export async function getFeatureFlag(flag: FeatureFlag): Promise<boolean> {

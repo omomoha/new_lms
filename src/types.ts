@@ -201,3 +201,79 @@ export interface Attempt {
   submittedAt: Timestamp;
   durationSec?: number | null; // time from opening the form to submitting (client-reported)
 }
+
+// ─── Community Forum (Phase 4 — Workstream B) ─────────────────────────────────
+// A standalone, cross-cohort discussion space, distinct from per-lesson Q&A.
+// Threading reuses src/lib/threading.ts; pure helpers live in src/lib/forum.ts.
+
+export type ForumVisibility = "all" | "cohort";
+
+/**
+ * forumCategories/{id}
+ * Admin-managed. "all" categories are visible to every authed user; "cohort"
+ * categories are gated on cohortIds membership (Firestore rules enforce both).
+ */
+export interface ForumCategory {
+  id: string;
+  name: string;
+  description: string;
+  order: number;
+  visibility: ForumVisibility;
+  cohortIds?: string[];          // required when visibility === "cohort"
+  aiModeration?: boolean;        // admin opt-in AI pre-moderation (default off)
+  postCount?: number;            // denormalized thread count (maintained by functions)
+  lastActivityAt?: Timestamp | null;
+  createdAt?: Timestamp;
+}
+
+/**
+ * forumThreads/{id} — the topic / original post.
+ * Created by any authed user; author-or-admin delete/edit; admin pin/lock.
+ */
+export interface ForumThread {
+  id: string;
+  categoryId: string;
+  authorId: string;
+  authorName: string;
+  title: string;
+  body: string;
+  pinned: boolean;
+  locked: boolean;
+  replyCount: number;
+  tags?: string[];
+  createdAt: Timestamp | null;
+  lastReplyAt: Timestamp | null;
+  editedAt?: Timestamp | null;
+  /** Set by AI pre-moderation when a category opts in; "pending" hides the post. */
+  moderation?: ForumModerationStatus;
+}
+
+/** forumThreads/{id}/posts/{postId} — a reply within a thread. */
+export interface ForumPost {
+  id: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  parentId: string | null;       // null = direct reply to the thread
+  createdAt: Timestamp | null;
+  editedAt?: Timestamp | null;
+  reactions?: Record<string, string[]>; // emoji → uids that reacted
+  moderation?: ForumModerationStatus;
+}
+
+export type ForumModerationStatus = "approved" | "pending" | "rejected";
+
+/**
+ * forumReports/{id} — a user report against a thread or post for moderator
+ * review. Written by any authed user; read/resolve by admins.
+ */
+export interface ForumReport {
+  id: string;
+  reporterId: string;
+  reporterName: string;
+  threadId: string;
+  postId?: string | null;        // null/absent → the thread itself is reported
+  reason: string;
+  resolved: boolean;
+  createdAt: Timestamp | null;
+}

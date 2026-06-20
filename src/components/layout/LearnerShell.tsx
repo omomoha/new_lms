@@ -29,6 +29,12 @@ export default function LearnerShell({ children }: { children: React.ReactNode }
           <ThemeToggle />
           {user && <NotificationsBell uid={user.uid} />}
           <Link
+            href="/learn/forum"
+            className="text-xs text-white/70 hover:text-white transition-colors"
+          >
+            Forum
+          </Link>
+          <Link
             href="/learn/achievements"
             className="text-xs text-white/70 hover:text-white transition-colors"
           >
