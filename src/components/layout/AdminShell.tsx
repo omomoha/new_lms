@@ -3,19 +3,23 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import ThemeToggle from "@/components/ui/ThemeToggle";
+import { getFeatureFlag } from "@/lib/featureFlags";
 
-const NAV = [
+// Phase-4 nav entries carry a `flag`: they only appear when that feature flag
+// is ON. With settings/features absent (prod default) the admin nav is EXACTLY
+// pre-Phase-4 — Analytics and Forum stay hidden until explicitly enabled.
+const NAV: { href: string; label: string; flag?: "analyticsDashboard" | "communityForum" }[] = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/courses", label: "Courses" },
   { href: "/admin/cohorts", label: "Cohorts" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/roster", label: "Roster" },
   { href: "/admin/assessments", label: "Insights" },
-  { href: "/admin/analytics", label: "Analytics" },
+  { href: "/admin/analytics", label: "Analytics", flag: "analyticsDashboard" },
   { href: "/admin/copilot", label: "Copilot" },
-  { href: "/admin/forum", label: "Forum" },
+  { href: "/admin/forum", label: "Forum", flag: "communityForum" },
   { href: "/admin/audit", label: "Audit" },
   { href: "/admin/onboarding", label: "Bulk Onboard" },
 ];
@@ -24,12 +28,33 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const { user, appUser, loading, signOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const [analyticsOn, setAnalyticsOn] = useState(false);
+  const [forumOn, setForumOn] = useState(false);
 
   useEffect(() => {
     if (!loading && (!user || appUser?.role !== "admin")) {
       router.replace("/auth/login");
     }
   }, [user, appUser, loading, router]);
+
+  useEffect(() => {
+    let alive = true;
+    void getFeatureFlag("analyticsDashboard").then((on) => {
+      if (alive) setAnalyticsOn(on);
+    });
+    void getFeatureFlag("communityForum").then((on) => {
+      if (alive) setForumOn(on);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const flagOn: Record<NonNullable<(typeof NAV)[number]["flag"]>, boolean> = {
+    analyticsDashboard: analyticsOn,
+    communityForum: forumOn,
+  };
+  const navItems = NAV.filter((item) => !item.flag || flagOn[item.flag]);
 
   if (loading || !user) return null;
 
@@ -45,7 +70,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           <span className="text-white/30 hidden sm:block flex-shrink-0">|</span>
           {/* Nav — wraps on mobile */}
           <nav aria-label="Admin navigation" className="flex flex-wrap gap-1 flex-1 min-w-0">
-            {NAV.map((item) => {
+            {navItems.map((item) => {
               // Use exact match for the Dashboard root to avoid highlighting it
               // on every other /admin/* page.
               const isActive =
