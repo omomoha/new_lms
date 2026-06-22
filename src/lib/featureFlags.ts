@@ -16,7 +16,9 @@ export type FeatureFlag =
   /** Community forum: categories, threads, replies, moderation (Workstream B). */
   | "communityForum"
   /** Deeper analytics & reporting dashboard (Phase 4 Workstream D). */
-  | "analyticsDashboard";
+  | "analyticsDashboard"
+  /** Adaptive video via Mux/HLS — signed playback + mux-player (Workstream C). */
+  | "muxVideo";
 
 /** Read a single feature flag; defaults to false on any error / missing key. */
 export async function getFeatureFlag(flag: FeatureFlag): Promise<boolean> {

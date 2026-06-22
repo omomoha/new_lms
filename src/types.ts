@@ -81,6 +81,15 @@ export interface Lesson {
   filePath?: string;       // Firebase Storage path for slides/doc/lab resources — use FileService.getResourceUrl()
   captionsPath?: string;   // Phase 3: Firebase Storage path to a WebVTT (.vtt) captions file
   transcript?: string;     // Phase 3: plain-text transcript shown below the video player
+
+  // ── Phase 4 — Workstream C (Adaptive video, Mux/HLS) ─────────────────────────
+  // When a lesson is served via Mux, videoPath holds "mux:{muxPlaybackId}" so the
+  // existing opaque-string seam keeps working. These explicit fields carry the
+  // same data for the builder UI and let the muxWebhook / backfill correlate.
+  muxUploadId?: string;    // Mux Direct Upload id (set on upload, before encode)
+  muxAssetId?: string;     // Mux asset id (set once the upload becomes an asset)
+  muxPlaybackId?: string;  // Mux signed playback id (set when the asset is ready)
+  muxStatus?: "preparing" | "ready" | "errored"; // surfaced in the builder
 }
 
 // ─── Enrollment ──────────────────────────────────────────────────────────────

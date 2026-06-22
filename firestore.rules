@@ -118,6 +118,11 @@ service cloud.firestore {
 
         // Fix #14: lessons subcollection — enforce same cohort-assignment check
         // as the course-level rule (not just published status).
+        // Phase 4 (Workstream C): the Mux fields (muxUploadId/muxAssetId/
+        // muxPlaybackId/muxStatus, and the "mux:" videoPath rewrite) are written
+        // ONLY by the muxWebhook / backfillVideosToMux functions via the admin
+        // SDK (which bypasses rules) or by an admin in the builder — clients can
+        // never forge them, since lesson writes stay admin-only here.
         match /lessons/{lessonId} {
           allow read: if isAdmin() || (isLearner() && canAccessCourse(courseId));
           allow write: if isAdmin();

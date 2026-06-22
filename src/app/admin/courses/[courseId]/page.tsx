@@ -27,7 +27,8 @@ import {
 import db from "@/lib/firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import functions from "@/lib/firebase/functions";
-import { videoService } from "@/lib/video";
+import { videoService, getVideoService } from "@/lib/video";
+import { parseMuxUploadId } from "@/lib/video/MuxVideoService";
 import { uploadResource, ACCEPT_BY_TYPE } from "@/lib/files";
 import type { Course, CourseModule, Lesson, LessonType, Cohort, Assessment, AssessmentKind } from "@/types";
 import AdminShell from "@/components/layout/AdminShell";
@@ -207,14 +208,28 @@ export default function CourseBuilderPage() {
 
       let videoPath: string | undefined;
       let videoUrl: string | undefined;
+      // Phase 4 (Workstream C): when the muxVideo flag is on, uploadVideo returns
+      // a "muxupload:{id}" marker (the asset/playback id isn't known until Mux
+      // finishes encoding — the muxWebhook fills it in and flips status→ready).
+      // We persist that as muxUploadId + muxStatus rather than videoPath.
+      let muxUploadId: string | undefined;
+      let muxStatus: Lesson["muxStatus"] | undefined;
 
       if (lessonType === "video") {
         if (videoFile) {
           const path = `videos/${courseId}/${moduleId}/${Date.now()}_${videoFile.name}`;
-          videoPath = await videoService.uploadVideo(videoFile, path, (p) =>
+          const svc = await getVideoService(courseId);
+          const uploaded = await svc.uploadVideo(videoFile, path, (p) =>
             setUploadPct(p.pct)
           );
           setUploadPct(null);
+          const uploadId = parseMuxUploadId(uploaded);
+          if (uploadId) {
+            muxUploadId = uploadId;
+            muxStatus = "preparing";
+          } else {
+            videoPath = uploaded;
+          }
         } else if (videoUrlInput.trim()) {
           const embedResult = toEmbedUrl(videoUrlInput.trim());
           if (!embedResult) {
@@ -247,6 +262,8 @@ export default function CourseBuilderPage() {
         type: lessonType,
         order,
         ...(videoPath ? { videoPath } : {}),
+        ...(muxUploadId ? { muxUploadId } : {}),
+        ...(muxStatus ? { muxStatus } : {}),
         ...(videoUrl ? { videoUrl } : {}),
         ...(filePath ? { filePath } : {}),
         ...(captionsPath ? { captionsPath } : {}),

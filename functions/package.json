@@ -15,25 +15,27 @@
   },
   "main": "lib/index.js",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@ffprobe-installer/ffprobe": "^2.1.2",
+    "@mux/mux-node": "^14.1.1",
+    "aws-lambda-libreoffice": "0.1.4",
     "ffmpeg-static": "^5.3.0",
     "firebase-admin": "^13.0.0",
     "firebase-functions": "^7.2.5",
     "fluent-ffmpeg": "^2.1.3",
+    "google-auth-library": "^9.0.0",
+    "jose": "^5.10.0",
     "mammoth": "^1.8.0",
     "pdf-lib": "^1.17.1",
-    "@anthropic-ai/sdk": "^0.39.0",
-    "aws-lambda-libreoffice": "0.1.4",
-    "tar-fs": "^2.1.1",
-    "google-auth-library": "^9.0.0",
-    "pdf-parse": "^1.1.1"
+    "pdf-parse": "^1.1.1",
+    "tar-fs": "^2.1.1"
   },
   "devDependencies": {
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "^20.14.9",
-    "typescript": "^5.5.3",
+    "@types/pdf-parse": "^1.1.4",
     "@types/tar-fs": "^2.0.4",
-    "@types/pdf-parse": "^1.1.4"
+    "typescript": "^5.5.3"
   },
   "private": true
 }

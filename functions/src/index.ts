@@ -11,6 +11,20 @@ export { syncRoleClaim } from "./syncRoleClaim";
 export { parseAssessmentDoc } from "./parseAssessmentDoc";
 export { getSignedVideoUrl } from "./getSignedVideoUrl";
 export { transcodeVideo } from "./transcodeVideo";
+
+// ── Adaptive video (Phase 4 — Workstream C: Mux/HLS) ───────────────────────────
+// New uploads go to Mux Direct Upload (createMuxUpload); playback is a signed HLS
+// URL minted by getMuxPlaybackToken (same requireCourseAccess gate as
+// getSignedVideoUrl); muxWebhook marks lessons ready on encode; backfillVideosToMux
+// migrates existing Storage videos/** in the background. All no-op gracefully
+// (failed-precondition) until the MUX_* secrets are set — safe with the flag OFF.
+// The legacy transcodeVideo 720p pipeline above stays exported during transition.
+export {
+  createMuxUpload,
+  getMuxPlaybackToken,
+  muxWebhook,
+  backfillVideosToMux,
+} from "./mux";
 export { convertOfficeToPdf, backfillOfficeConversions } from "./convertOfficeToPdf";
 export { transcribeVideo } from "./transcribeVideo";
 export {

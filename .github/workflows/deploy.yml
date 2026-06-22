@@ -112,9 +112,31 @@ jobs:
           else
             echo "ANTHROPIC_API_KEY secret not set — deploying with AI features disabled"
           fi
+          # Phase 4 (Workstream C): Mux/HLS adaptive video. All five secrets are
+          # optional — if unset, the Mux callables return failed-precondition
+          # (like aiClient without ANTHROPIC_API_KEY) and the muxVideo feature
+          # flag stays off, so the deploy is unaffected. MUX_SIGNING_PRIVATE_KEY
+          # may be base64 (Mux console download) or PEM; muxClient handles both.
+          if [ -n "${MUX_TOKEN_ID}" ]; then
+            {
+              echo "MUX_TOKEN_ID=${MUX_TOKEN_ID}"
+              echo "MUX_TOKEN_SECRET=${MUX_TOKEN_SECRET}"
+              echo "MUX_SIGNING_KEY_ID=${MUX_SIGNING_KEY_ID}"
+              echo "MUX_SIGNING_PRIVATE_KEY=${MUX_SIGNING_PRIVATE_KEY}"
+              echo "MUX_WEBHOOK_SECRET=${MUX_WEBHOOK_SECRET}"
+            } >> functions/.env
+            echo "functions/.env updated (Mux adaptive video enabled)"
+          else
+            echo "MUX_TOKEN_ID secret not set — deploying with Mux video disabled"
+          fi
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           AI_MODEL: ${{ secrets.AI_MODEL }}
+          MUX_TOKEN_ID: ${{ secrets.MUX_TOKEN_ID }}
+          MUX_TOKEN_SECRET: ${{ secrets.MUX_TOKEN_SECRET }}
+          MUX_SIGNING_KEY_ID: ${{ secrets.MUX_SIGNING_KEY_ID }}
+          MUX_SIGNING_PRIVATE_KEY: ${{ secrets.MUX_SIGNING_PRIVATE_KEY }}
+          MUX_WEBHOOK_SECRET: ${{ secrets.MUX_WEBHOOK_SECRET }}
 
       # LibreOffice (PPTX→PDF conversion) is bundled as an Amazon Linux build;
       # Google's functions runtime image lacks the X11/session libraries it
