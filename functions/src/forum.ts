@@ -153,7 +153,7 @@ export async function moderateForumContent(
       "doxxing, sexual content, or obvious spam/scams). Reply with STRICT JSON " +
       'only: {"flagged": boolean, "reason": string}. Keep reason under 120 ' +
       "characters. When in doubt for ordinary technical discussion, do not flag.";
-    const fenced = fenceUntrusted(text, "post");
+    const fenced = fenceUntrusted("post", text);
     const resp = await aiClient().messages.create({
       model: aiModel(),
       max_tokens: 200,
