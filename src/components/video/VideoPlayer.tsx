@@ -19,7 +19,9 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import db from "@/lib/firebase/firestore";
-import { videoService } from "@/lib/video";
+import { videoService, getVideoService } from "@/lib/video";
+import { isMuxPath } from "@/lib/video/MuxVideoService";
+import { attachHls, isHlsUrl } from "@/lib/video/hls";
 import { getResourceUrl } from "@/lib/files";
 import { shouldSaveProgress, calcProgressPct } from "@/lib/progress";
 import type { LessonProgress } from "@/types";
@@ -54,6 +56,15 @@ export function VideoPlayer({
   const [quality, setQuality] = useState<"source" | "720p">("source");
   const [qualityNote, setQualityNote] = useState<string | null>(null);
   const [switching, setSwitching] = useState(false);
+  // Phase 4 (Workstream C): true when this lesson is served via Mux/HLS. In that
+  // mode adaptive bitrate is automatic (hls.js), so the manual source/720p
+  // quality picker — which is specific to the Storage transcode variant — hides.
+  const [isMux, setIsMux] = useState(false);
+  // Holds the hls.js teardown so source swaps / unmount never leak a player.
+  const hlsCleanup = useRef<(() => void) | null>(null);
+  // Resume position captured at load — applied by the native <video> path
+  // immediately and by the HLS attach path once media metadata is available.
+  const resumePosRef = useRef<number>(0);
   const [completed, setCompleted] = useState(false);
   const completedRef = useRef(false); // Fix #1/#2: authoritative ref for race-free completion check
   const lastSavedAt = useRef<number>(0);
@@ -66,16 +77,26 @@ export function VideoPlayer({
     let cancelled = false;
     (async () => {
       try {
-        const playbackUrl = await videoService.getPlaybackUrl(videoPath);
+        // Resolve the active provider behind the muxVideo feature flag. Default
+        // (flag OFF) returns the unchanged SignedUrlVideoService.
+        const svc = await getVideoService(courseId);
+        const playbackUrl = await svc.getPlaybackUrl(videoPath);
         if (cancelled) return;
+        // A "mux:"-prefixed videoPath OR an .m3u8 URL means adaptive HLS.
+        setIsMux(isMuxPath(videoPath) || isHlsUrl(playbackUrl));
         setUrl(playbackUrl);
 
         // Fetch saved progress for resume
         const snap = await getDoc(doc(db, "progress", progressDocId));
-        if (snap.exists() && videoRef.current) {
+        if (snap.exists()) {
           const progress = snap.data() as LessonProgress;
           if (progress.positionSec > 0) {
-            videoRef.current.currentTime = progress.positionSec;
+            resumePosRef.current = progress.positionSec;
+            // Native/plain-URL path: <video> already has the source, so apply
+            // immediately. The HLS path applies resumePosRef after attach.
+            if (videoRef.current && !isMuxPath(videoPath)) {
+              videoRef.current.currentTime = progress.positionSec;
+            }
           }
           const isCompleted = !!progress.completedAt;
           setCompleted(isCompleted);
@@ -87,7 +108,39 @@ export function VideoPlayer({
       }
     })();
     return () => { cancelled = true; };
-  }, [videoPath, progressDocId]);
+  }, [videoPath, progressDocId, courseId]);
+
+  // Phase 4 (Workstream C): attach the Mux/HLS manifest via hls.js (or native
+  // HLS on Safari) once the element + signed URL are ready. Applies the saved
+  // resume position after metadata loads, and tears the player down on cleanup.
+  useEffect(() => {
+    if (!isMux || !url) return;
+    const video = videoRef.current;
+    if (!video) return;
+    let disposed = false;
+    (async () => {
+      const cleanup = await attachHls(video, url);
+      if (disposed) {
+        cleanup();
+        return;
+      }
+      hlsCleanup.current = cleanup;
+      const restore = () => {
+        if (resumePosRef.current > 0) {
+          try { video.currentTime = resumePosRef.current; } catch { /* no-op */ }
+        }
+      };
+      if (video.readyState >= 1) restore();
+      else video.addEventListener("loadedmetadata", restore, { once: true });
+    })();
+    return () => {
+      disposed = true;
+      if (hlsCleanup.current) {
+        hlsCleanup.current();
+        hlsCleanup.current = null;
+      }
+    };
+  }, [isMux, url]);
 
   // Switch between source and the 720p variant, preserving position/play state.
   const handleQualityChange = useCallback(async (next: "source" | "720p") => {
@@ -273,7 +326,9 @@ export function VideoPlayer({
     <div className="w-full">
       <video
         ref={videoRef}
-        src={url}
+        // Mux/HLS: hls.js (or native HLS on Safari) owns the source — see the
+        // attach effect above. Storage/plain URLs set src directly as before.
+        src={isMux ? undefined : url}
         controls
         playsInline
         controlsList="nodownload noremoteplayback"
@@ -296,25 +351,28 @@ export function VideoPlayer({
           />
         )}
       </video>
-      {/* Quality picker — just below the frame, right-aligned */}
-      <div className="flex items-center justify-end gap-2 mt-2">
-        {qualityNote && (
-          <span className="text-xs text-amber-700">{qualityNote}</span>
-        )}
-        <label className="text-xs inline-flex items-center gap-1.5 text-brand-muted">
-          Quality
-          <select
-            value={quality}
-            disabled={switching}
-            onChange={(e) => handleQualityChange(e.target.value as "source" | "720p")}
-            className="input-field !w-auto !py-1 text-xs"
-            aria-label="Video quality"
-          >
-            <option value="source">Best (up to 1080p)</option>
-            <option value="720p">720p</option>
-          </select>
-        </label>
-      </div>
+      {/* Quality picker — Storage/transcode only. On Mux/HLS the bitrate ladder
+          is adaptive (hls.js), so the manual source/720p picker is hidden. */}
+      {!isMux && (
+        <div className="flex items-center justify-end gap-2 mt-2">
+          {qualityNote && (
+            <span className="text-xs text-amber-700">{qualityNote}</span>
+          )}
+          <label className="text-xs inline-flex items-center gap-1.5 text-brand-muted">
+            Quality
+            <select
+              value={quality}
+              disabled={switching}
+              onChange={(e) => handleQualityChange(e.target.value as "source" | "720p")}
+              className="input-field !w-auto !py-1 text-xs"
+              aria-label="Video quality"
+            >
+              <option value="source">Best (up to 1080p)</option>
+              <option value="720p">720p</option>
+            </select>
+          </label>
+        </div>
+      )}
 
       {/* Fix #3: inline save-error message */}
       {saveError && (
