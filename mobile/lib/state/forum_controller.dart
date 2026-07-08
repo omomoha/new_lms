@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../logic/forum_rules.dart';
 import '../models/forum.dart';
 import '../services/firestore_service.dart';
+import '../util/offline.dart';
 
 /// ForumHomeController (7B) — loads forum categories once and exposes the list
 /// the viewer may see (visibility "all" + cohort-intersect), sorted by `order`.
@@ -84,6 +85,7 @@ class ForumCategoryController extends ChangeNotifier {
 
   bool _loading = true;
   String? _error;
+  String? _createError;
   bool _denied = false;
   bool _disposed = false;
   ForumCategory? _category;
@@ -93,6 +95,9 @@ class ForumCategoryController extends ChangeNotifier {
 
   bool get loading => _loading;
   String? get error => _error;
+
+  /// Set when a thread create genuinely fails (not merely queued offline).
+  String? get createError => _createError;
   bool get denied => _denied;
   ForumCategory? get category => _category;
   String get search => _search;
@@ -154,17 +159,29 @@ class ForumCategoryController extends ChangeNotifier {
   }
 
   /// Create a thread; returns the new thread id (available even when queued
-  /// offline) or null when not signed in / empty input.
+  /// offline) or null when not signed in / empty input. A genuine
+  /// (rules/validation) failure surfaces on `createError`; an offline-queued
+  /// write is treated as success (the SDK syncs it on reconnect).
   String? createThread({required String title, required String body}) {
     if (!isSignedIn) return null;
     if (title.trim().isEmpty || body.trim().isEmpty) return null;
-    return _fs.createForumThread(
+    _createError = null;
+    final res = _fs.createForumThread(
       categoryId: categoryId,
       authorId: uid,
       authorName: displayName,
       title: title,
       body: body,
     );
+    // Don't block on the ack (would hang while offline). Only report a REAL
+    // failure — offline timeouts/unavailable are expected and self-heal.
+    res.ack.catchError((Object e) {
+      if (!isOfflineError(e)) {
+        _createError = 'Could not post your thread. Please try again.';
+        _safeNotify();
+      }
+    });
+    return res.id;
   }
 
   void _safeNotify() {

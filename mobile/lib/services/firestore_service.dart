@@ -632,13 +632,18 @@ class FirestoreService {
   /// Returns the new thread id. NEVER sets pinned/locked/moderation to a
   /// non-default (admin-only fields).
   /// Returns the new thread id synchronously (the ref id is known before the
-  /// server ack), so navigation works even when the create is queued offline.
-  /// Offline-persistence applies the write to the local cache immediately and
-  /// syncs later; awaiting the server ack would block the UI while offline, so
-  /// the write is issued without awaiting and errors are logged (a create that
-  /// satisfies the rules cannot be denied). The realtime threads stream shows
-  /// the new thread from the local cache.
-  String createForumThread({
+  /// server ack) so navigation works even when the create is queued offline,
+  /// AND the write's `ack` Future so the caller can distinguish a genuine
+  /// (rules/validation) failure from an offline-queued write. Offline
+  /// persistence applies the write to the local cache immediately and syncs
+  /// later; awaiting the ack would block the UI while offline. The realtime
+  /// threads stream shows the new thread from the local cache.
+  ///
+  /// The `ack` completes when the server acknowledges the write, or throws for a
+  /// real failure. While offline it simply doesn't complete until reconnect, so
+  /// the caller should race it against a short timeout (see util/offline.dart)
+  /// rather than block on it.
+  ({String id, Future<void> ack}) createForumThread({
     required String categoryId,
     required String authorId,
     required String authorName,
@@ -647,8 +652,7 @@ class FirestoreService {
     List<String> tags = const [],
   }) {
     final ref = _db.collection('forumThreads').doc();
-    // ignore: unawaited_futures
-    ref.set({
+    final ack = ref.set({
       'categoryId': categoryId,
       'authorId': authorId,
       'authorName': _clamp(authorName, maxNameLength),
@@ -660,8 +664,8 @@ class FirestoreService {
       'tags': tags.take(8).toList(),
       'createdAt': FieldValue.serverTimestamp(),
       'lastReplyAt': FieldValue.serverTimestamp(),
-    }).catchError((Object e) => debugPrint('createForumThread: $e'));
-    return ref.id;
+    });
+    return (id: ref.id, ack: ack);
   }
 
   /// Author edit of a thread. Writes ONLY title/body/editedAt — the exact keys
