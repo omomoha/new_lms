@@ -1,0 +1,32 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+/// Mirrors `Enrollment` in src/types.ts.
+/// Firestore path: enrollments/{userId}_{courseId}
+class Enrollment {
+  final String userId;
+  final String courseId;
+  final String cohortId;
+  final double progressPct; // 0–100
+  final String? lastLessonId;
+
+  const Enrollment({
+    required this.userId,
+    required this.courseId,
+    required this.cohortId,
+    required this.progressPct,
+    this.lastLessonId,
+  });
+
+  static String docId(String userId, String courseId) => '${userId}_$courseId';
+
+  factory Enrollment.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data() ?? <String, dynamic>{};
+    return Enrollment(
+      userId: (data['userId'] ?? '') as String,
+      courseId: (data['courseId'] ?? '') as String,
+      cohortId: (data['cohortId'] ?? '') as String,
+      progressPct: ((data['progressPct'] ?? 0) as num).toDouble(),
+      lastLessonId: data['lastLessonId'] as String?,
+    );
+  }
+}
