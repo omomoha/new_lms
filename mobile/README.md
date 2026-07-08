@@ -5,9 +5,15 @@ backend as the web portal (`andela-lms-dae5f`). This lives alongside the
 Next.js web app in the same repo (monorepo) on the `feature/mobile-ui` branch.
 
 Full learner parity with the web portal is complete — **Phases 1–6 done**
-(see `docs/MOBILE_PARITY_PLAN.md`). Admin, AI tutor, AI-lab grading, community
-forum and Mux/HLS video are intentionally out of scope (clean seams left for
-later).
+(see `docs/MOBILE_PARITY_PLAN.md`) — plus **Phase 7: AI tutor, community forum,
+and lesson discussions** (see `docs/MOBILE_PHASE7_TUTOR_FORUM_PLAN.md`), feature-
+flag gated to match the web (`tutorEnhancements`, `communityForum`). Admin,
+AI-lab grading, and Mux/HLS video remain out of scope (clean seams left).
+
+> Backend note: the tutor/forum Cloud Functions and Firestore rules were merged
+> onto `main` (from `recent_update`) and must be deployed for these to run;
+> seed `settings/features` with `tutorEnhancements`/`communityForum: true` and
+> at least one `forumCategories` doc.
 
 ## What's built (learner parity — Phases 1–6)
 
