@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../services/feature_flags_service.dart';
 import '../../state/auth_controller.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/notifications_bell.dart';
@@ -40,6 +41,10 @@ class AppShell extends StatelessWidget {
           ]),
         ),
         actions: [
+          // Community forum entry point (Phase 7B) — only shown when the
+          // `communityForum` feature flag is ON (matches the web gating). The
+          // shared FeatureFlagsService caches settings/features after one read.
+          const _ForumAppBarAction(),
           // Live notifications bell (stream + unread badge + mark-read).
           if (uid != null) NotificationsBell(uid: uid),
           IconButton(
@@ -83,4 +88,30 @@ class AppShell extends StatelessWidget {
   }
 
   static String titleFor(int index) => _titles[index];
+}
+
+/// AppBar action linking to the community forum. Renders nothing until the
+/// feature-flag service has loaded, and stays empty when `communityForum` is
+/// OFF — so the entry point never appears for a disabled feature.
+class _ForumAppBarAction extends StatelessWidget {
+  const _ForumAppBarAction();
+
+  @override
+  Widget build(BuildContext context) {
+    final flags = context.read<FeatureFlagsService>();
+    return FutureBuilder<void>(
+      future: flags.ensureLoaded(),
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done ||
+            !flags.isCommunityForum) {
+          return const SizedBox.shrink();
+        }
+        return IconButton(
+          tooltip: 'Community forum',
+          icon: const Icon(Icons.forum_outlined),
+          onPressed: () => context.push('/forum'),
+        );
+      },
+    );
+  }
 }

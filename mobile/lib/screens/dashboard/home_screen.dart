@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../logic/due_dates.dart';
+import '../../services/feature_flags_service.dart';
 import '../../services/firestore_service.dart';
 import '../../state/auth_controller.dart';
 import '../../state/dashboard_controller.dart';
@@ -107,6 +108,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 16),
 
+              // Community forum entry (Phase 7B) — only when `communityForum`
+              // is ON (gated by the shared feature-flag service; matches web).
+              const _ForumHomeCard(),
+
               if (all.isEmpty)
                 const Padding(
                   padding: EdgeInsets.only(top: 80),
@@ -175,6 +180,61 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+/// Dashboard entry point to the community forum (Phase 7B). Renders nothing
+/// until the feature-flag service loads, and stays empty while `communityForum`
+/// is OFF — so it never surfaces a disabled feature.
+class _ForumHomeCard extends StatelessWidget {
+  const _ForumHomeCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final flags = context.read<FeatureFlagsService>();
+    return FutureBuilder<void>(
+      future: flags.ensureLoaded(),
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done ||
+            !flags.isCommunityForum) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Card(
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => context.push('/forum'),
+              child: const Padding(
+                padding: EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(Icons.forum_outlined, color: AppColors.teal),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Community forum',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.ink)),
+                          SizedBox(height: 2),
+                          Text('Ask questions and connect across cohorts',
+                              style: TextStyle(
+                                  fontSize: 13, color: AppColors.muted)),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right, color: AppColors.muted),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

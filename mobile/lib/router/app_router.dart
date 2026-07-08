@@ -15,6 +15,9 @@ import '../screens/profile/profile_screen.dart';
 import '../screens/course/course_detail_screen.dart';
 import '../screens/lesson/lesson_screen.dart';
 import '../screens/verify/verify_certificate_screen.dart';
+import '../screens/forum/forum_home_screen.dart';
+import '../screens/forum/forum_category_screen.dart';
+import '../screens/forum/forum_thread_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -98,6 +101,28 @@ GoRouter buildRouter(AuthController auth) {
           courseId: s.pathParameters['courseId']!,
           lessonId: s.pathParameters['lessonId']!,
         ),
+      ),
+
+      // Community forum (Phase 7B) — full-screen pushes on the root navigator.
+      // Feature-flag gated: the entry points (AppBar action + Home card) only
+      // appear when `communityForum` is ON, and each screen re-checks the flag
+      // via ForumGate. Routes: /forum, /forum/category/:id, /forum/thread/:id.
+      GoRoute(
+        path: '/forum',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (_, __) => const ForumHomeScreen(),
+      ),
+      GoRoute(
+        path: '/forum/category/:categoryId',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (_, s) =>
+            ForumCategoryScreen(categoryId: s.pathParameters['categoryId']!),
+      ),
+      GoRoute(
+        path: '/forum/thread/:threadId',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (_, s) =>
+            ForumThreadScreen(threadId: s.pathParameters['threadId']!),
       ),
     ],
   );

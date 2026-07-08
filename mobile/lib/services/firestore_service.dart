@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../models/app_user.dart';
 import '../models/course.dart';
@@ -16,6 +17,9 @@ import '../models/lesson_feedback.dart';
 import '../models/app_notification.dart';
 import '../models/tutor.dart';
 import '../models/discussion.dart';
+import '../models/forum.dart';
+import '../logic/forum_rules.dart'
+    show maxBodyLength, maxNameLength, maxTitleLength;
 
 /// All learner-facing Firestore reads/writes, matching the query patterns in
 /// the web portal (src/app/learn/*).
@@ -545,6 +549,263 @@ class FirestoreService {
   Future<void> deleteDiscussion(String id) async {
     await _db.collection('discussions').doc(id).delete();
   }
+
+  // ── Community Forum (Phase 7B) ──────────────────────────────────────────────
+  //
+  // All queries are single-field / equality-only (no composite indexes). Reads
+  // use realtime snapshots() exactly where the web does (thread list + posts);
+  // categories + single thread doc are one-shot getDoc/getDocs. Every write
+  // below writes ONLY the fields firestore.rules validates — see the cited rule
+  // line numbers. Server triggers (onForumThreadCreated / onForumReplyCreated)
+  // own the counters (postCount/replyCount/lastReplyAt bumps), mentions and AI
+  // pre-moderation — the client NEVER writes those.
+
+  /// All forum categories (one-shot). Rules (firestore.rules lines 400-408)
+  /// enforce read access; the client re-filters visibility via
+  /// logic/forum_rules.visibleCategories so it never surfaces a denied category.
+  Future<List<ForumCategory>> fetchForumCategories() async {
+    final snap = await _db.collection('forumCategories').get();
+    return snap.docs.map(ForumCategory.fromDoc).toList();
+  }
+
+  /// One category by id (used to gate a category screen). Null if missing.
+  Future<ForumCategory?> fetchForumCategory(String id) async {
+    final snap = await _db.collection('forumCategories').doc(id).get();
+    if (!snap.exists) return null;
+    return ForumCategory.fromDoc(snap);
+  }
+
+  /// Realtime threads in a category — a SINGLE equality filter
+  /// `where(categoryId==)` (firestore.rules line 425 allows any authed read;
+  /// no composite index). Callers sort/search/paginate + hide pending threads
+  /// client-side (mirrors the web `subscribeThreads`).
+  Stream<List<ForumThread>> forumThreadsStream(String categoryId) {
+    return _db
+        .collection('forumThreads')
+        .where('categoryId', isEqualTo: categoryId)
+        .snapshots()
+        .map((snap) => snap.docs.map(ForumThread.fromDoc).toList());
+  }
+
+  /// Realtime single thread doc (single-doc snapshot — no index). Keeps
+  /// replyCount/locked/moderation fresh as the server trigger bumps them. Null
+  /// while the doc does not exist.
+  Stream<ForumThread?> forumThreadStream(String id) {
+    return _db
+        .collection('forumThreads')
+        .doc(id)
+        .snapshots()
+        .map((snap) => snap.exists ? ForumThread.fromDoc(snap) : null);
+  }
+
+  /// One thread by id (one-shot). Null if missing.
+  Future<ForumThread?> fetchForumThread(String id) async {
+    final snap = await _db.collection('forumThreads').doc(id).get();
+    if (!snap.exists) return null;
+    return ForumThread.fromDoc(snap);
+  }
+
+  /// Realtime posts (replies) for a thread (firestore.rules line 472 allows any
+  /// authed read). Mirrors the web `subscribePosts` — the WHOLE posts
+  /// subcollection is streamed for parity. Callers apply a client render cap
+  /// (see forum_thread_screen). If threads grow large, the single-field-safe
+  /// upgrade is `.orderBy('createdAt').limit(N)` + a "load more" cursor here;
+  /// orderBy(createdAt) is a single-field order requiring no composite index.
+  Stream<List<ForumPost>> forumPostsStream(String threadId) {
+    return _db
+        .collection('forumThreads')
+        .doc(threadId)
+        .collection('posts')
+        .snapshots()
+        .map((snap) => snap.docs.map(ForumPost.fromDoc).toList());
+  }
+
+  /// Create a thread. Writes ONLY the fields firestore.rules validates on
+  /// create (firestore.rules lines 426-439):
+  ///   authorId == uid, categoryId string, title string 1..200,
+  ///   body string 1..5000, authorName string <=100,
+  ///   pinned == false, locked == false, replyCount == 0.
+  /// Exact write field-set (matches web forumClient.createThread):
+  ///   { categoryId, authorId, authorName(<=100), title(trim,<=200),
+  ///     body(trim,<=5000), pinned:false, locked:false, replyCount:0,
+  ///     tags(<=8), createdAt, lastReplyAt }.
+  /// Returns the new thread id. NEVER sets pinned/locked/moderation to a
+  /// non-default (admin-only fields).
+  /// Returns the new thread id synchronously (the ref id is known before the
+  /// server ack), so navigation works even when the create is queued offline.
+  /// Offline-persistence applies the write to the local cache immediately and
+  /// syncs later; awaiting the server ack would block the UI while offline, so
+  /// the write is issued without awaiting and errors are logged (a create that
+  /// satisfies the rules cannot be denied). The realtime threads stream shows
+  /// the new thread from the local cache.
+  String createForumThread({
+    required String categoryId,
+    required String authorId,
+    required String authorName,
+    required String title,
+    required String body,
+    List<String> tags = const [],
+  }) {
+    final ref = _db.collection('forumThreads').doc();
+    // ignore: unawaited_futures
+    ref.set({
+      'categoryId': categoryId,
+      'authorId': authorId,
+      'authorName': _clamp(authorName, maxNameLength),
+      'title': _clamp(title.trim(), maxTitleLength),
+      'body': _clamp(body.trim(), maxBodyLength),
+      'pinned': false,
+      'locked': false,
+      'replyCount': 0,
+      'tags': tags.take(8).toList(),
+      'createdAt': FieldValue.serverTimestamp(),
+      'lastReplyAt': FieldValue.serverTimestamp(),
+    }).catchError((Object e) => debugPrint('createForumThread: $e'));
+    return ref.id;
+  }
+
+  /// Author edit of a thread. Writes ONLY title/body/editedAt — the exact keys
+  /// firestore.rules' `threadAuthorEditKeys()` allows (firestore.rules lines
+  /// 420-447: author update diff hasOnly ["title","body","editedAt"], bounds
+  /// re-checked). Denied server-side once the 15-min author window closes /
+  /// caller not the author.
+  Future<void> editForumThread({
+    required String id,
+    required String title,
+    required String body,
+  }) async {
+    await _db.collection('forumThreads').doc(id).update({
+      'title': _clamp(title.trim(), maxTitleLength),
+      'body': _clamp(body.trim(), maxBodyLength),
+      'editedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Delete a thread (author or admin per firestore.rules lines 448-449; gate
+  /// the button with logic/forum_rules.canModerate).
+  Future<void> deleteForumThread(String id) async {
+    await _db.collection('forumThreads').doc(id).delete();
+  }
+
+  /// Create a reply. Writes ONLY the fields firestore.rules validates on create
+  /// (firestore.rules lines 473-482): authorId == uid, body string 1..5000,
+  /// authorName string <=100, parentId null|string, AND parentThread().locked
+  /// == false (lock enforced at the rules layer). Exact write field-set:
+  ///   { authorId, authorName(<=100), body(trim,<=5000), parentId, createdAt }.
+  /// (reactions is intentionally NOT set on create.)
+  Future<void> createForumReply({
+    required String threadId,
+    required String authorId,
+    required String authorName,
+    required String body,
+    required String? parentId,
+  }) async {
+    await _db.collection('forumThreads').doc(threadId).collection('posts').add({
+      'authorId': authorId,
+      'authorName': _clamp(authorName, maxNameLength),
+      'body': _clamp(body.trim(), maxBodyLength),
+      'parentId': parentId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Author edit of a reply. Writes ONLY body/editedAt — the exact keys
+  /// firestore.rules' `postAuthorEditKeys()` allows (firestore.rules lines
+  /// 464-489, hasOnly ["body","editedAt"], bounds re-checked).
+  Future<void> editForumPost({
+    required String threadId,
+    required String postId,
+    required String body,
+  }) async {
+    await _db
+        .collection('forumThreads')
+        .doc(threadId)
+        .collection('posts')
+        .doc(postId)
+        .update({
+      'body': _clamp(body.trim(), maxBodyLength),
+      'editedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Delete a reply (author or admin per firestore.rules lines 490-491).
+  Future<void> deleteForumPost(String threadId, String postId) async {
+    await _db
+        .collection('forumThreads')
+        .doc(threadId)
+        .collection('posts')
+        .doc(postId)
+        .delete();
+  }
+
+  /// Toggle a single emoji reaction by [uid] on a post. Reads the current map,
+  /// adds/removes the uid, and writes ONLY the `reactions` field — the
+  /// reactions-only diff any authed user may make per firestore.rules'
+  /// `reactionOnlyChange()` (firestore.rules lines 468-489). Empty lists are
+  /// removed from the map. Mirrors the web forumClient.toggleReaction (same
+  /// read-modify-write race caveat).
+  Future<void> toggleForumReaction({
+    required String threadId,
+    required String postId,
+    required String emoji,
+    required String uid,
+  }) async {
+    final ref = _db
+        .collection('forumThreads')
+        .doc(threadId)
+        .collection('posts')
+        .doc(postId);
+    final snap = await ref.get();
+    if (!snap.exists) return;
+    final raw = (snap.data()?['reactions']);
+    final current = <String, List<String>>{};
+    if (raw is Map) {
+      raw.forEach((k, v) {
+        if (v is List) current[k.toString()] = List<String>.from(v);
+      });
+    }
+    final list = List<String>.from(current[emoji] ?? const []);
+    if (list.contains(uid)) {
+      list.remove(uid);
+    } else {
+      list.add(uid);
+    }
+    final next = <String, List<String>>{...current};
+    if (list.isNotEmpty) {
+      next[emoji] = list;
+    } else {
+      next.remove(emoji);
+    }
+    await ref.update({'reactions': next});
+  }
+
+  /// Report a thread or post for moderation. Writes ONLY the fields
+  /// firestore.rules validates on create (firestore.rules lines 502-508):
+  ///   reporterId == uid, threadId string, reason string 1..1000,
+  ///   resolved == false. Exact write field-set:
+  ///   { reporterId, reporterName(<=100), threadId, postId ?? null,
+  ///     reason(trim,<=1000), resolved:false, createdAt }.
+  /// Learners cannot read the report's resolution (rules lines 500-501).
+  Future<void> reportForumContent({
+    required String reporterId,
+    required String reporterName,
+    required String threadId,
+    String? postId,
+    required String reason,
+  }) async {
+    await _db.collection('forumReports').add({
+      'reporterId': reporterId,
+      'reporterName': _clamp(reporterName, maxNameLength),
+      'threadId': threadId,
+      'postId': postId,
+      'reason': _clamp(reason.trim(), 1000),
+      'resolved': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  static String _clamp(String s, int max) =>
+      s.length > max ? s.substring(0, max) : s;
 
   /// Resolves a Firebase Storage path (e.g. thumbPath) to a download URL.
   Future<String?> resolveStorageUrl(String? path) async {
