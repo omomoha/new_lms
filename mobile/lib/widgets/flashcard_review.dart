@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../logic/spaced_repetition.dart';
 import '../models/flashcard.dart';
 import '../theme/app_theme.dart';
+import '../util/offline.dart';
 
 /// Spaced-repetition review session. Receives the due cards (already
 /// filtered/sorted by the controller), shows one at a time with a tap-to-flip
@@ -79,18 +80,25 @@ class _FlashcardReviewState extends State<FlashcardReview> {
       _saving = true;
       _error = null;
     });
-    try {
-      final next = review(card.schedule, grade, DateTime.now());
-      await widget.onSave(card.id, Flashcard.scheduleUpdate(next));
-      _advance();
-    } catch (_) {
+    final next = review(card.schedule, grade, DateTime.now());
+    final outcome = await runOfflineAwareWrite(
+      () => widget.onSave(card.id, Flashcard.scheduleUpdate(next)),
+    );
+    if (!mounted) return;
+    if (outcome == WriteOutcome.failed) {
       setState(() {
+        _saving = false;
         _error =
             "Couldn't save that review — check your connection and try again.";
       });
-    } finally {
-      if (mounted) setState(() => _saving = false);
+      return;
     }
+    // synced or queuedOffline — advance (offline writes are queued by the SDK).
+    if (outcome == WriteOutcome.queuedOffline) {
+      showSavedOfflineSnackBar(context);
+    }
+    setState(() => _saving = false);
+    _advance();
   }
 
   @override
@@ -191,7 +199,8 @@ class _FlashcardReviewState extends State<FlashcardReview> {
                     style: FilledButton.styleFrom(
                       backgroundColor: _grades[i].bg,
                       foregroundColor: _grades[i].fg,
-                      minimumSize: const Size.fromHeight(46),
+                      // A11y: >=48dp tap target.
+                      minimumSize: const Size.fromHeight(48),
                       padding: EdgeInsets.zero,
                     ),
                     child: Text(_grades[i].label,

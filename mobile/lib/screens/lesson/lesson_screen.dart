@@ -11,6 +11,7 @@ import '../../services/video_service.dart';
 import '../../state/auth_controller.dart';
 import '../../state/lesson_controller.dart';
 import '../../theme/app_theme.dart';
+import '../../util/offline.dart';
 import '../../widgets/loading.dart';
 import '../../widgets/progress_bar.dart';
 import '../../widgets/quiz_form.dart';
@@ -63,12 +64,16 @@ class _LessonScreenState extends State<LessonScreen> {
   }
 
   Future<void> _complete({bool advance = false}) async {
-    await _c.markComplete();
+    final outcome = await _c.markComplete();
     if (!mounted) return;
-    if (_c.markError != null) {
+    if (outcome == WriteOutcome.failed) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(_c.markError!)));
+          .showSnackBar(SnackBar(content: Text(_c.markError ?? 'Failed.')));
       return;
+    }
+    if (outcome == WriteOutcome.queuedOffline) {
+      // Non-blocking: the SDK queued the write; progress already reflects.
+      showSavedOfflineSnackBar(context);
     }
     if (advance) {
       final next = _c.nextLessonId;
@@ -156,6 +161,9 @@ class _LessonScreenState extends State<LessonScreen> {
               initiallyCompleted: _c.currentCompleted,
               resumePositionSec: _c.resumePositionSec,
               onCompleted: () => _complete(advance: false),
+              onSavedOffline: () {
+                if (mounted) showSavedOfflineSnackBar(context);
+              },
             ),
             if ((lesson.transcript ?? '').isNotEmpty)
               _Transcript(text: lesson.transcript!),

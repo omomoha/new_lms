@@ -141,7 +141,10 @@ class _NotificationsBellState extends State<NotificationsBell> {
       clipBehavior: Clip.none,
       children: [
         IconButton(
-          tooltip: 'Notifications',
+          // A11y: announce the unread count to screen readers.
+          tooltip: unreadCount > 0
+              ? 'Notifications, $unreadCount unread'
+              : 'Notifications',
           icon: const Icon(Icons.notifications_none),
           onPressed: _openPanel,
         ),

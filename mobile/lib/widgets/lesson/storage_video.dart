@@ -6,6 +6,7 @@ import '../../logic/progress.dart';
 import '../../services/firestore_service.dart';
 import '../../services/video_service.dart';
 import '../../theme/app_theme.dart';
+import '../../util/offline.dart';
 
 /// Firebase-Storage video with resume + throttled progress saves + auto
 /// mark-complete on end. URL resolved via [VideoService] (getSignedVideoUrl).
@@ -23,6 +24,7 @@ class StorageVideo extends StatefulWidget {
     required this.initiallyCompleted,
     required this.resumePositionSec,
     required this.onCompleted,
+    this.onSavedOffline,
   });
 
   final String uid;
@@ -38,6 +40,10 @@ class StorageVideo extends StatefulWidget {
   /// the progress-write + enrollment recompute.
   final VoidCallback onCompleted;
 
+  /// Called at most once when a throttled progress save is queued offline, so
+  /// the screen can surface a non-blocking "saved offline" affordance.
+  final VoidCallback? onSavedOffline;
+
   @override
   State<StorageVideo> createState() => _StorageVideoState();
 }
@@ -50,6 +56,7 @@ class _StorageVideoState extends State<StorageVideo> {
   int _lastSavedMs = 0;
   bool _wasPlaying = false;
   bool _completed = false; // completedRef guard — never overwrite completedAt
+  bool _offlineNotified = false; // one-shot "saved offline" affordance
 
   @override
   void initState() {
@@ -133,14 +140,25 @@ class _StorageVideoState extends State<StorageVideo> {
     final watchedPct = dur.inMilliseconds > 0
         ? ((pos.inMilliseconds / dur.inMilliseconds) * 100).round()
         : 0;
-    // Fire-and-forget; failures are non-fatal to playback.
-    widget.firestore.saveVideoProgress(
-      uid: widget.uid,
-      courseId: widget.courseId,
-      lessonId: widget.lessonId,
-      positionSec: pos.inSeconds,
-      watchedPct: watchedPct,
-    );
+    // Fire-and-forget; failures are non-fatal to playback. When offline the
+    // write is queued locally — surface the "saved offline" note once so the
+    // learner knows their position will sync later (never blocks playback).
+    runOfflineAwareWrite(
+      () => widget.firestore.saveVideoProgress(
+        uid: widget.uid,
+        courseId: widget.courseId,
+        lessonId: widget.lessonId,
+        positionSec: pos.inSeconds,
+        watchedPct: watchedPct,
+      ),
+    ).then((outcome) {
+      if (outcome == WriteOutcome.queuedOffline &&
+          !_offlineNotified &&
+          mounted) {
+        _offlineNotified = true;
+        widget.onSavedOffline?.call();
+      }
+    });
   }
 
   void _markComplete() {

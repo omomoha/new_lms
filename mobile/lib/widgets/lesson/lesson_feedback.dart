@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/firestore_service.dart';
 import '../../theme/app_theme.dart';
+import '../../util/offline.dart';
 
 /// "Was this lesson helpful?" widget. Writes lessonFeedback/{uid}_{lessonId}
 /// (rating 1-5 int, comment <=1000, updatedAt). Prefills existing feedback and
@@ -64,26 +65,31 @@ class _LessonFeedbackState extends State<LessonFeedback> {
       _saving = true;
       _error = null;
     });
-    try {
-      await widget.firestore.saveLessonFeedback(
+    final outcome = await runOfflineAwareWrite(
+      () => widget.firestore.saveLessonFeedback(
         uid: widget.uid,
         lessonId: widget.lessonId,
         courseId: widget.courseId,
         rating: _rating,
         comment: _commentController.text,
-      );
-      if (!mounted) return;
-      setState(() {
-        _saved = true;
-        _hasExisting = true;
-        _saving = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
+      ),
+    );
+    if (!mounted) return;
+    if (outcome == WriteOutcome.failed) {
       setState(() {
         _error = 'Could not save your feedback. Please try again.';
         _saving = false;
       });
+      return;
+    }
+    // synced or queuedOffline — treat as saved (the SDK queues offline writes).
+    setState(() {
+      _saved = true;
+      _hasExisting = true;
+      _saving = false;
+    });
+    if (outcome == WriteOutcome.queuedOffline) {
+      showSavedOfflineSnackBar(context);
     }
   }
 
@@ -110,8 +116,11 @@ class _LessonFeedbackState extends State<LessonFeedback> {
                 final n = i + 1;
                 final filled = n <= _rating;
                 return IconButton(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  constraints: const BoxConstraints(),
+                  // A11y: explicit label for screen readers + a >=44dp target.
+                  tooltip: 'Rate $n star${n == 1 ? '' : 's'}',
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  constraints:
+                      const BoxConstraints(minWidth: 44, minHeight: 44),
                   onPressed: () => setState(() {
                     _rating = n;
                     _saved = false;

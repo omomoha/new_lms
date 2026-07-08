@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../logic/progress.dart';
+import '../util/offline.dart';
 import '../models/assessment.dart';
 import '../models/attempt.dart';
 import '../models/course.dart';
@@ -140,58 +141,78 @@ class LessonController extends ChangeNotifier {
   /// Marks the current lesson complete: writes the progress doc (with the
   /// completedAt guard — never re-completes) and recomputes the enrollment
   /// progressPct over ALL course lessons. Mirrors the web mark-complete.
-  Future<void> markComplete() async {
-    if (_marking || currentCompleted) return;
+  ///
+  /// The local state is updated OPTIMISTICALLY before the write so the tree
+  /// ticks instantly and the UI never blocks on the network — when offline the
+  /// Firestore SDK queues the write and this returns [WriteOutcome.queuedOffline]
+  /// so the screen can show a "saved offline" affordance. A genuine failure is
+  /// reverted and returns [WriteOutcome.failed].
+  Future<WriteOutcome> markComplete() async {
+    if (_marking || currentCompleted) return WriteOutcome.synced;
     _marking = true;
     _markError = null;
     _safeNotify();
-    try {
-      // Recompute pct over ALL lessons: previously-completed + this one.
-      final completedIds = _progress.values
-          .where((p) => p.isCompleted)
-          .map((p) => p.lessonId)
-          .toList();
-      final pct = calcProgressPct([...completedIds, lessonId], allLessonIds);
 
-      // Preserve an existing enrollment's cohortId; only fall back to the
-      // learner's primary cohort when creating a fresh enrollment (mirrors web,
-      // whose update path never rewrites cohortId).
-      final existingCohort = _enrollment?.cohortId ?? '';
-      final effectiveCohortId =
-          existingCohort.isNotEmpty ? existingCohort : cohortId;
+    // Recompute pct over ALL lessons: previously-completed + this one.
+    final completedIds = _progress.values
+        .where((p) => p.isCompleted)
+        .map((p) => p.lessonId)
+        .toList();
+    final pct = calcProgressPct([...completedIds, lessonId], allLessonIds);
 
-      await _fs.markLessonComplete(
+    // Preserve an existing enrollment's cohortId; only fall back to the
+    // learner's primary cohort when creating a fresh enrollment (mirrors web,
+    // whose update path never rewrites cohortId).
+    final existingCohort = _enrollment?.cohortId ?? '';
+    final effectiveCohortId =
+        existingCohort.isNotEmpty ? existingCohort : cohortId;
+
+    // Snapshot for revert-on-failure.
+    final prevProgress = _progress[lessonId];
+    final prevEnrollment = _enrollment;
+
+    // Optimistic local update — reflect immediately, don't block on the write.
+    _progress[lessonId] = LessonProgress(
+      userId: uid,
+      lessonId: lessonId,
+      courseId: courseId,
+      watchedPct: 100,
+      positionSec: 0,
+      completedAt: DateTime.now(),
+    );
+    _enrollment = Enrollment(
+      userId: uid,
+      courseId: courseId,
+      cohortId: _enrollment?.cohortId ?? cohortId,
+      progressPct: pct.toDouble(),
+      lastLessonId: lessonId,
+      updatedAt: DateTime.now(),
+    );
+    _marking = false;
+    _safeNotify();
+
+    final outcome = await runOfflineAwareWrite(
+      () => _fs.markLessonComplete(
         uid: uid,
         courseId: courseId,
         lessonId: lessonId,
         cohortId: effectiveCohortId,
         courseProgressPct: pct.toDouble(),
-      );
+      ),
+    );
 
-      // Reflect locally so the tree ticks + progress update immediately.
-      _progress[lessonId] = LessonProgress(
-        userId: uid,
-        lessonId: lessonId,
-        courseId: courseId,
-        watchedPct: 100,
-        positionSec: 0,
-        completedAt: DateTime.now(),
-      );
-      _enrollment = Enrollment(
-        userId: uid,
-        courseId: courseId,
-        cohortId: _enrollment?.cohortId ?? cohortId,
-        progressPct: pct.toDouble(),
-        lastLessonId: lessonId,
-        updatedAt: DateTime.now(),
-      );
-      _marking = false;
-      _safeNotify();
-    } catch (_) {
+    if (outcome == WriteOutcome.failed) {
+      // Revert the optimistic update on a genuine (non-offline) failure.
+      if (prevProgress != null) {
+        _progress[lessonId] = prevProgress;
+      } else {
+        _progress.remove(lessonId);
+      }
+      _enrollment = prevEnrollment;
       _markError = 'Could not mark lesson complete. Please try again.';
-      _marking = false;
       _safeNotify();
     }
+    return outcome;
   }
 
   static T? _firstWhereOrNull<T>(Iterable<T> items, bool Function(T) test) {
