@@ -13,6 +13,7 @@ import '../models/flashcard.dart';
 import '../models/cohort.dart';
 import '../models/assessment.dart';
 import '../models/lesson_feedback.dart';
+import '../models/app_notification.dart';
 
 /// All learner-facing Firestore reads/writes, matching the query patterns in
 /// the web portal (src/app/learn/*).
@@ -210,6 +211,45 @@ class FirestoreService {
         .where('userId', isEqualTo: uid)
         .get();
     return snap.docs.map(Flashcard.fromDoc).toList();
+  }
+
+  /// Persist a flashcard's new scheduling state after a review grade. Writes
+  /// ONLY the {interval, ease, reps, due} fields (firestore.rules restricts a
+  /// learner's flashcard update to exactly these keys) via updateDoc, matching
+  /// the web's FlashcardReview.
+  Future<void> updateFlashcardSchedule(
+      String cardId, Map<String, dynamic> scheduleUpdate) async {
+    await _db.collection('flashcards').doc(cardId).update(scheduleUpdate);
+  }
+
+  /// Live subscription to the learner's own notifications — a single equality
+  /// filter, NO orderBy (avoids a composite index). Callers sort desc + cap
+  /// client-side, mirroring the web NotificationsBell.
+  Stream<List<AppNotification>> notificationsStream(String uid) {
+    return _db
+        .collection('notifications')
+        .where('userId', isEqualTo: uid)
+        .snapshots()
+        .map((snap) => snap.docs.map(AppNotification.fromDoc).toList());
+  }
+
+  /// Mark one notification read. Writes ONLY readAt (the only field the learner
+  /// may update per firestore.rules).
+  Future<void> markNotificationRead(String id) async {
+    await _db
+        .collection('notifications')
+        .doc(id)
+        .update({'readAt': FieldValue.serverTimestamp()});
+  }
+
+  /// Mark many notifications read in one batch. Each update writes ONLY readAt.
+  Future<void> markNotificationsRead(Iterable<String> ids) async {
+    final batch = _db.batch();
+    for (final id in ids) {
+      batch.update(_db.collection('notifications').doc(id),
+          {'readAt': FieldValue.serverTimestamp()});
+    }
+    await batch.commit();
   }
 
   /// Public single-doc read of a certificate (the /verify/{certId} page). The

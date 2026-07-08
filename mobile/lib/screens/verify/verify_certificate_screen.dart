@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/certificate.dart';
 import '../../services/firestore_service.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/loading.dart';
 
 /// Public certificate verification page (`/verify/:certId`). Reachable without
 /// auth. Reads certificates/{certId.toUpperCase()} via a public single `get`
 /// (never a list). Mirrors `src/app/verify/[certId]/page.tsx`.
-///
-/// This is a functional stub for Phases 2-3; Phase 5 may enrich the layout.
 class VerifyCertificateScreen extends StatefulWidget {
   const VerifyCertificateScreen({super.key, required this.certId});
   final String certId;
@@ -23,6 +21,8 @@ class VerifyCertificateScreen extends StatefulWidget {
 class _VerifyCertificateScreenState extends State<VerifyCertificateScreen> {
   late Future<Certificate?> _future;
 
+  String get _upperId => widget.certId.toUpperCase();
+
   @override
   void initState() {
     super.initState();
@@ -32,118 +32,163 @@ class _VerifyCertificateScreenState extends State<VerifyCertificateScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Certificate verification')),
-      body: FutureBuilder<Certificate?>(
-        future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Loading();
-          }
-          if (snap.hasError) {
-            return const _Status(
-              icon: Icons.error_outline,
-              color: AppColors.muted,
-              title: 'Could not verify',
-              body: 'Something went wrong. Please try again.',
-            );
-          }
-          final cert = snap.data;
-          if (cert == null) {
-            return _Status(
-              icon: Icons.help_outline,
-              color: AppColors.muted,
-              title: 'Certificate not found',
-              body: 'No certificate matches ID "${widget.certId.toUpperCase()}".',
-            );
-          }
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.verified,
-                          size: 48, color: AppColors.accent),
-                      const SizedBox(height: 12),
-                      const Text('Valid certificate',
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.primary)),
-                      const SizedBox(height: 16),
-                      _row('Name', cert.learnerName),
-                      _row('Course', cert.courseTitle),
-                      _row('Certificate ID', cert.certId),
-                      if (cert.issuedAt != null)
-                        _row('Issued',
-                            cert.issuedAt!.toLocal().toString().split(' ').first),
-                    ],
+      backgroundColor: AppColors.primary,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 24),
+                  // Diamond motif + title.
+                  Transform.rotate(
+                    angle: 0.785398,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      color: AppColors.accent,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 14),
+                  const Text('Andela Learn — Certificate Verification',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 24),
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    padding: const EdgeInsets.all(28),
+                    child: FutureBuilder<Certificate?>(
+                      future: _future,
+                      builder: (context, snap) {
+                        if (snap.connectionState == ConnectionState.waiting) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Text('Checking certificate…',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: AppColors.muted)),
+                          );
+                        }
+                        if (snap.hasError) return _error();
+                        final cert = snap.data;
+                        if (cert == null) return _notFound();
+                        return _valid(cert);
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
               ),
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
 
-  Widget _row(String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 110,
-              child: Text(label,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 13)),
-            ),
-            Expanded(
-              child: Text(value,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600, color: AppColors.ink)),
-            ),
-          ],
+  Widget _valid(Certificate cert) {
+    final issued = cert.issuedAt != null
+        ? DateFormat('d MMMM y').format(cert.issuedAt!)
+        : null;
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.mint,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: const Text('✓ Valid certificate',
+              style: TextStyle(
+                  fontWeight: FontWeight.w700, color: AppColors.primary)),
         ),
-      );
-}
-
-class _Status extends StatelessWidget {
-  const _Status(
-      {required this.icon,
-      required this.color,
-      required this.title,
-      required this.body});
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 48, color: color),
-            const SizedBox(height: 12),
-            Text(title,
+        const SizedBox(height: 20),
+        const Text('AWARDED TO',
+            style: TextStyle(
+                fontSize: 11,
+                letterSpacing: 0.5,
+                color: AppColors.muted,
+                fontWeight: FontWeight.w600)),
+        const SizedBox(height: 4),
+        Text(cert.learnerName,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary)),
+        const SizedBox(height: 16),
+        const Text('FOR COMPLETING',
+            style: TextStyle(
+                fontSize: 11,
+                letterSpacing: 0.5,
+                color: AppColors.muted,
+                fontWeight: FontWeight.w600)),
+        const SizedBox(height: 4),
+        Text(cert.courseTitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ink)),
+        const SizedBox(height: 20),
+        if (issued != null)
+          Text('Issued $issued',
+              style: const TextStyle(fontSize: 13, color: AppColors.muted)),
+        const SizedBox(height: 4),
+        Text.rich(
+          TextSpan(children: [
+            const TextSpan(
+                text: 'Certificate ID: ',
+                style: TextStyle(fontSize: 13, color: AppColors.muted)),
+            TextSpan(
+                text: cert.certId,
                 style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.ink)),
-            const SizedBox(height: 6),
-            Text(body,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.muted)),
-          ],
+                    color: AppColors.muted)),
+          ]),
         ),
-      ),
+      ],
+    );
+  }
+
+  Widget _notFound() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFEE2E2),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: const Text('✕ No certificate found',
+              style: TextStyle(
+                  fontWeight: FontWeight.w700, color: Color(0xFF991B1B))),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'No certificate with ID $_upperId exists. Check the ID and try again.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 13, color: AppColors.muted),
+        ),
+      ],
+    );
+  }
+
+  Widget _error() {
+    return const Text(
+      'Could not check the certificate right now. Please try again shortly.',
+      textAlign: TextAlign.center,
+      style: TextStyle(fontSize: 13, color: Color(0xFF991B1B)),
     );
   }
 }

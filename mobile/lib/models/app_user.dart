@@ -9,6 +9,7 @@ class AppUser {
   final String role; // "admin" | "learner"
   final List<String> cohortIds;
   final String status; // "active" | "inactive" | "pending"
+  final DateTime? createdAt; // profile "joined" date
 
   const AppUser({
     required this.uid,
@@ -17,6 +18,7 @@ class AppUser {
     required this.role,
     required this.cohortIds,
     required this.status,
+    this.createdAt,
   });
 
   bool get isLearner => role == 'learner';
@@ -30,6 +32,7 @@ class AppUser {
     String? role,
     List<String>? cohortIds,
     String? status,
+    DateTime? createdAt,
   }) {
     return AppUser(
       uid: uid ?? this.uid,
@@ -38,11 +41,13 @@ class AppUser {
       role: role ?? this.role,
       cohortIds: cohortIds ?? this.cohortIds,
       status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 
   factory AppUser.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? <String, dynamic>{};
+    final created = data['createdAt'];
     return AppUser(
       uid: doc.id,
       email: (data['email'] ?? '') as String,
@@ -50,6 +55,7 @@ class AppUser {
       role: (data['role'] ?? 'learner') as String,
       cohortIds: List<String>.from((data['cohortIds'] ?? const <String>[]) as List),
       status: (data['status'] ?? 'active') as String,
+      createdAt: created is Timestamp ? created.toDate() : null,
     );
   }
 }

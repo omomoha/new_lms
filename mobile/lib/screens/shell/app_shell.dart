@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../state/auth_controller.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/notifications_bell.dart';
 
 /// Bottom-navigation shell hosting the four learner tabs (Home, Review,
 /// Achievements, Profile). Course/lesson/verify screens are pushed full-screen
@@ -22,6 +23,8 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final index = navigationShell.currentIndex;
+    final uid = context.select<AuthController, String?>(
+        (a) => a.profile?.uid ?? a.firebaseUser?.uid);
     return Scaffold(
       appBar: AppBar(
         title: const Text.rich(
@@ -37,18 +40,8 @@ class AppShell extends StatelessWidget {
           ]),
         ),
         actions: [
-          // Notifications bell — placeholder until Phase 5 wires the live
-          // notifications stream + unread badge.
-          IconButton(
-            tooltip: 'Notifications',
-            icon: const Icon(Icons.notifications_none),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Notifications arrive in a later update.')),
-              );
-            },
-          ),
+          // Live notifications bell (stream + unread badge + mark-read).
+          if (uid != null) NotificationsBell(uid: uid),
           IconButton(
             tooltip: 'Sign out',
             icon: const Icon(Icons.logout),
