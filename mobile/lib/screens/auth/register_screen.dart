@@ -39,11 +39,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
     if (!mounted) return;
     setState(() => _busy = false);
-    if (!ok && auth.error != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(auth.error!)));
+    if (!ok) {
+      if (auth.error != null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(auth.error!)));
+      }
+      return;
     }
-    // On success, router redirects to /verify (email verification required).
+    // Matches web: the account is created, a verification email is sent, and
+    // the user is signed OUT until they verify. Point them at sign-in.
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Account created. Check your inbox to verify your email, then sign in.',
+        ),
+      ),
+    );
+    context.go('/login');
   }
 
   @override

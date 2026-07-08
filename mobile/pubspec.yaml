@@ -16,6 +16,9 @@ dependencies:
   cloud_firestore: ^5.4.4
   cloud_functions: ^5.1.3
   firebase_storage: ^12.3.4
+  # App Check attestation (Play Integrity / DeviceCheck). 0.3.x aligns with
+  # firebase_core ^3.6 / firebase BoM used above.
+  firebase_app_check: ^0.3.1+4
 
   # State + navigation
   provider: ^6.1.2
@@ -26,12 +29,26 @@ dependencies:
   cached_network_image: ^3.4.1
   url_launcher: ^6.3.0
 
+  # Lesson rendering (Phase 3) + shared utilities
+  flutter_markdown: ^0.7.4     # text lessons (Markdown)
+  pdfx: ^2.6.0                 # inline PDF viewer (downloads disabled)
+  video_player: ^2.9.2         # Storage video playback
+  chewie: ^1.8.5               # video controls wrapper around video_player
+  webview_flutter: ^4.10.0     # external YouTube / Drive embeds
+  flutter_secure_storage: ^9.2.2 # secure token / secret handling
+  intl: ^0.19.0               # date/number formatting
+
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  # Test-only fakes so model fromDoc + auth service/controller tests are
+  # runnable without a live Firebase project. Versions align with
+  # cloud_firestore ^5.x / firebase_auth ^5.x above.
+  fake_cloud_firestore: ^3.0.3
+  firebase_auth_mocks: ^0.14.1
 
 flutter:
   uses-material-design: true

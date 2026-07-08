@@ -21,6 +21,25 @@ class AppUser {
 
   bool get isLearner => role == 'learner';
   bool get isAdmin => role == 'admin';
+  bool get isInactive => status == 'inactive';
+
+  AppUser copyWith({
+    String? uid,
+    String? email,
+    String? name,
+    String? role,
+    List<String>? cohortIds,
+    String? status,
+  }) {
+    return AppUser(
+      uid: uid ?? this.uid,
+      email: email ?? this.email,
+      name: name ?? this.name,
+      role: role ?? this.role,
+      cohortIds: cohortIds ?? this.cohortIds,
+      status: status ?? this.status,
+    );
+  }
 
   factory AppUser.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? <String, dynamic>{};

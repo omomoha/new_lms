@@ -12,6 +12,13 @@ class Course {
   final String availability; // "cohorts" (default) | "all"
   final String? thumbPath;
 
+  // Certificate template fields (Phase 3 on web) — used by certificate cards.
+  final String? certTemplatePath;
+  final String? certTemplateTextColor; // "dark" | "light"
+  final String? certSignaturePath;
+  final String? certSignatoryName;
+  final String? certSignatoryTitle;
+
   const Course({
     required this.id,
     required this.title,
@@ -21,6 +28,11 @@ class Course {
     required this.assignedCohortIds,
     required this.availability,
     this.thumbPath,
+    this.certTemplatePath,
+    this.certTemplateTextColor,
+    this.certSignaturePath,
+    this.certSignatoryName,
+    this.certSignatoryTitle,
   });
 
   factory Course.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -36,6 +48,11 @@ class Course {
           (data['assignedCohortIds'] ?? const <String>[]) as List),
       availability: (data['availability'] ?? 'cohorts') as String,
       thumbPath: data['thumbPath'] as String?,
+      certTemplatePath: data['certTemplatePath'] as String?,
+      certTemplateTextColor: data['certTemplateTextColor'] as String?,
+      certSignaturePath: data['certSignaturePath'] as String?,
+      certSignatoryName: data['certSignatoryName'] as String?,
+      certSignatoryTitle: data['certSignatoryTitle'] as String?,
     );
   }
 

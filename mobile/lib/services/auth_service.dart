@@ -27,31 +27,55 @@ class AuthService {
     );
   }
 
-  /// Creates the auth account, the users/{uid} profile doc, and sends a
-  /// verification email — matching the web portal's self-signup flow.
-  Future<UserCredential> register({
+  /// Self-service signup — matches src/contexts/AuthContext.tsx `register()`
+  /// EXACTLY:
+  ///   1. create the Auth user
+  ///   2. updateProfile(displayName)
+  ///   3. create users/{uid} with role:'learner', status:'active', cohortIds:[]
+  ///   4. send the verification email (best-effort)
+  ///   5. sign out — no session until the address is verified
+  ///
+  /// Returns whether the verification email was sent (mirrors the web's
+  /// `{ verificationSent }`). Throws [FirebaseAuthException] on account-creation
+  /// failures (weak password, email in use, ...).
+  Future<bool> register({
     required String name,
     required String email,
     required String password,
   }) async {
+    final cleanName = name.trim();
+    final cleanEmail = email.trim();
     final cred = await _auth.createUserWithEmailAndPassword(
-      email: email.trim(),
+      email: cleanEmail,
       password: password,
     );
-    final uid = cred.user!.uid;
+    final user = cred.user!;
+    final uid = user.uid;
 
+    await user.updateDisplayName(cleanName);
+
+    // Field shape must match the web exactly for cross-platform account parity
+    // (firestore.rules requires uid == the doc id and role == 'learner').
     await _db.collection('users').doc(uid).set({
-      'email': email.trim(),
-      'name': name.trim(),
+      'uid': uid,
+      'email': cleanEmail,
+      'name': cleanName,
       'role': 'learner',
       'cohortIds': <String>[],
-      'status': 'pending',
+      'status': 'active',
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    await cred.user!.updateDisplayName(name.trim());
-    await cred.user!.sendEmailVerification();
-    return cred;
+    bool verificationSent = true;
+    try {
+      await user.sendEmailVerification();
+    } catch (_) {
+      verificationSent = false;
+    }
+
+    // No session until verified: sign straight out (mirrors the web flow).
+    await _auth.signOut();
+    return verificationSent;
   }
 
   Future<void> sendVerificationEmail() async {
@@ -60,6 +84,37 @@ class AuthService {
 
   Future<void> sendPasswordReset(String email) {
     return _auth.sendPasswordResetEmail(email: email.trim());
+  }
+
+  /// Change the signed-in user's password: reauthenticate with the current
+  /// password (Firebase requires recent auth) then update.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null || user.email == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'You must be signed in to change your password.',
+      );
+    }
+    final credential = EmailAuthProvider.credential(
+      email: user.email!,
+      password: currentPassword,
+    );
+    await user.reauthenticateWithCredential(credential);
+    await user.updatePassword(newPassword);
+  }
+
+  /// Update the display name on both the Auth profile and users/{uid}.name.
+  /// firestore.rules permits a learner to update ONLY the `name` field.
+  Future<void> updateDisplayName(String name) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    final cleanName = name.trim();
+    await user.updateDisplayName(cleanName);
+    await _db.collection('users').doc(user.uid).update({'name': cleanName});
   }
 
   Future<void> signOut() => _auth.signOut();

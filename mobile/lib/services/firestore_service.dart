@@ -7,6 +7,10 @@ import '../models/course_module.dart';
 import '../models/lesson.dart';
 import '../models/enrollment.dart';
 import '../models/lesson_progress.dart';
+import '../models/attempt.dart';
+import '../models/certificate.dart';
+import '../models/flashcard.dart';
+import '../models/cohort.dart';
 
 /// All learner-facing Firestore reads/writes, matching the query patterns in
 /// the web portal (src/app/learn/*).
@@ -98,20 +102,101 @@ class FirestoreService {
     return snap.docs.map(Lesson.fromDoc).toList();
   }
 
-  /// The learner's progress across a whole course, keyed by lessonId.
-  Future<Map<String, LessonProgress>> getCourseProgress(
-      String uid, String courseId) async {
+  /// ALL of the learner's progress docs — a single-field `where(userId==uid)`
+  /// query (rules-provable, no composite index). Callers filter/sort in Dart.
+  Future<List<LessonProgress>> getUserProgress(String uid) async {
     final snap = await _db
         .collection('progress')
         .where('userId', isEqualTo: uid)
-        .where('courseId', isEqualTo: courseId)
         .get();
+    return snap.docs.map(LessonProgress.fromDoc).toList();
+  }
+
+  /// The learner's progress across a whole course, keyed by lessonId.
+  ///
+  /// Deliberately a SINGLE-FIELD `where(userId==uid)` query with client-side
+  /// filtering by courseId — mirrors the web to avoid composite indexes and
+  /// stay provable under firestore.rules.
+  Future<Map<String, LessonProgress>> getCourseProgress(
+      String uid, String courseId) async {
+    final all = await getUserProgress(uid);
     final map = <String, LessonProgress>{};
-    for (final d in snap.docs) {
-      final p = LessonProgress.fromDoc(d);
-      map[p.lessonId] = p;
+    for (final p in all) {
+      if (p.courseId == courseId) map[p.lessonId] = p;
     }
     return map;
+  }
+
+  /// All of the learner's completion dates (from progress.completedAt) — used
+  /// by streak/gamification computations. Single-field query.
+  Future<List<DateTime>> completionDates(String uid) async {
+    final all = await getUserProgress(uid);
+    return all
+        .where((p) => p.completedAt != null)
+        .map((p) => p.completedAt!)
+        .toList();
+  }
+
+  /// All of the learner's enrollments — single-field `where(userId==uid)`.
+  Future<List<Enrollment>> getUserEnrollments(String uid) async {
+    final snap = await _db
+        .collection('enrollments')
+        .where('userId', isEqualTo: uid)
+        .get();
+    return snap.docs.map(Enrollment.fromDoc).toList();
+  }
+
+  /// All of the learner's assessment attempts — single-field query. Callers
+  /// filter (e.g. by courseId/kind/passed) and sort client-side.
+  Future<List<Attempt>> getUserAttempts(String uid) async {
+    final snap = await _db
+        .collection('attempts')
+        .where('userId', isEqualTo: uid)
+        .get();
+    return snap.docs.map(Attempt.fromDoc).toList();
+  }
+
+  /// All of the learner's certificates — single-field query.
+  Future<List<Certificate>> getUserCertificates(String uid) async {
+    final snap = await _db
+        .collection('certificates')
+        .where('userId', isEqualTo: uid)
+        .get();
+    return snap.docs.map(Certificate.fromDoc).toList();
+  }
+
+  /// All of the learner's flashcards — single-field query. Callers split
+  /// due/future client-side by `due`.
+  Future<List<Flashcard>> getUserFlashcards(String uid) async {
+    final snap = await _db
+        .collection('flashcards')
+        .where('userId', isEqualTo: uid)
+        .get();
+    return snap.docs.map(Flashcard.fromDoc).toList();
+  }
+
+  /// Public single-doc read of a certificate (the /verify/{certId} page). The
+  /// web upper-cases the path param before lookup — do the same.
+  Future<Certificate?> getCertificate(String certId) async {
+    final snap =
+        await _db.collection('certificates').doc(certId.toUpperCase()).get();
+    if (!snap.exists) return null;
+    return Certificate.fromDoc(snap);
+  }
+
+  /// Fetch a learner's member cohort docs (fail-soft — a denied/missing cohort
+  /// is skipped rather than throwing). Used for courseDueDates.
+  Future<List<Cohort>> getMemberCohorts(List<String> cohortIds) async {
+    final cohorts = <Cohort>[];
+    for (final id in cohortIds) {
+      try {
+        final snap = await _db.collection('cohorts').doc(id).get();
+        if (snap.exists) cohorts.add(Cohort.fromDoc(snap));
+      } catch (_) {
+        // Not a member / offline — skip.
+      }
+    }
+    return cohorts;
   }
 
   /// Marks a lesson complete and bumps course-level enrollment progress.

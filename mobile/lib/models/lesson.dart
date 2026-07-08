@@ -33,6 +33,7 @@ class Lesson {
   final String? textContent; // HTML/Markdown for text lessons
   final String? fileUrl; // slides/doc/lab download URL
   final String? filePath; // Storage path for resources
+  final String? captionsPath; // Storage path to a WebVTT (.vtt) captions file
   final String? transcript;
 
   const Lesson({
@@ -45,6 +46,7 @@ class Lesson {
     this.textContent,
     this.fileUrl,
     this.filePath,
+    this.captionsPath,
     this.transcript,
   });
 
@@ -60,6 +62,7 @@ class Lesson {
       textContent: data['textContent'] as String?,
       fileUrl: data['fileUrl'] as String?,
       filePath: data['filePath'] as String?,
+      captionsPath: data['captionsPath'] as String?,
       transcript: data['transcript'] as String?,
     );
   }
