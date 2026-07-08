@@ -14,6 +14,8 @@ import '../models/cohort.dart';
 import '../models/assessment.dart';
 import '../models/lesson_feedback.dart';
 import '../models/app_notification.dart';
+import '../models/tutor.dart';
+import '../models/discussion.dart';
 
 /// All learner-facing Firestore reads/writes, matching the query patterns in
 /// the web portal (src/app/learn/*).
@@ -407,6 +409,141 @@ class FirestoreService {
     );
 
     await batch.commit();
+  }
+
+  // ── Tutor (Phase 7A) ──────────────────────────────────────────────────────
+
+  /// The learner's most recent tutor conversations (id/title/time + turns) —
+  /// `users/{uid}/tutorConversations` `orderBy(updatedAt desc) limit(20)`.
+  /// SINGLE-FIELD orderBy (no composite index). Read-only: these docs are
+  /// written server-side by the askTutor callable; the client NEVER writes here
+  /// (firestore.rules: `allow write: if false`). Only used for the optional
+  /// enhanced history list.
+  Future<List<TutorConversation>> getTutorConversations(String uid,
+      {int max = 20}) async {
+    final snap = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('tutorConversations')
+        .orderBy('updatedAt', descending: true)
+        .limit(max)
+        .get();
+    return snap.docs.map(TutorConversation.fromDoc).toList();
+  }
+
+  /// Load one tutor conversation owned by [uid]. Null if missing. Read-only.
+  Future<TutorConversation?> getTutorConversation(
+      String uid, String conversationId) async {
+    final snap = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('tutorConversations')
+        .doc(conversationId)
+        .get();
+    if (!snap.exists) return null;
+    return TutorConversation.fromDoc(snap);
+  }
+
+  /// Write thumbs up/down (+ optional reason) for a tutor answer into
+  /// `tutorFeedback/{uid}_{conversationId}_{turnIndex}` (re-rating overwrites,
+  /// never duplicates).
+  ///
+  /// Writes ONLY the fields firestore.rules validates on write (see rule
+  /// `match /tutorFeedback/{feedbackId}`, recent_update lines 214-219):
+  ///   allow write: if isAuthed()
+  ///     && feedbackId.matches(request.auth.uid + "_.+")
+  ///     && request.resource.data.userId == request.auth.uid
+  ///     && request.resource.data.rating in ["up", "down"]
+  ///     && request.resource.data.reason is string
+  ///     && request.resource.data.reason.size() <= 1000;
+  /// So the exact write field-set is:
+  ///   { userId, conversationId, turnIndex, courseId, rating, reason, createdAt }.
+  /// (`conversationId`/`turnIndex`/`courseId`/`createdAt` are unconstrained by
+  /// the rule but written for admin-analytics parity with the web.)
+  Future<void> submitTutorFeedback({
+    required String uid,
+    required String conversationId,
+    required int turnIndex,
+    required String courseId,
+    required String rating, // "up" | "down"
+    String reason = '',
+  }) async {
+    final clampedReason =
+        reason.length > 1000 ? reason.substring(0, 1000) : reason;
+    final id = '${uid}_${conversationId}_$turnIndex';
+    await _db.collection('tutorFeedback').doc(id).set({
+      'userId': uid,
+      'conversationId': conversationId,
+      'turnIndex': turnIndex,
+      'courseId': courseId,
+      'rating': rating,
+      'reason': clampedReason,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // ── Discussions (Phase 7C) ──────────────────────────────────────────────────
+
+  /// Per-lesson Q&A for a lesson. The read MUST filter by BOTH `courseId` AND
+  /// `lessonId` equalities: the rule resolves course access from
+  /// `resource.data.courseId`, provable for list queries only when courseId is
+  /// pinned by the query — a lessonId-only query is DENIED for learners. This is
+  /// a two-equality query on distinct fields, served WITHOUT a composite index
+  /// (equality-only). `courseId` is re-filtered client-side for safety (web
+  /// does the same).
+  Future<List<Discussion>> fetchDiscussions(
+      String courseId, String lessonId) async {
+    final snap = await _db
+        .collection('discussions')
+        .where('courseId', isEqualTo: courseId)
+        .where('lessonId', isEqualTo: lessonId)
+        .get();
+    return snap.docs
+        .map(Discussion.fromDoc)
+        .where((d) => d.courseId == courseId) // client-side course filter
+        .toList();
+  }
+
+  /// Create a discussion post (question when [parentId] is null, else a reply).
+  ///
+  /// Writes ONLY the fields firestore.rules validates on create (see rule
+  /// `match /discussions/{postId}`, recent_update lines 294-304):
+  ///   allow create: if isAuthed()
+  ///     && request.resource.data.userId == request.auth.uid
+  ///     && request.resource.data.body is string (size 1..2000)
+  ///     && request.resource.data.userName is string (size <= 100)
+  ///     && (parentId == null || parentId is string)
+  ///     && (isAdmin() || canAccessCourse(request.resource.data.courseId));
+  /// Exact write field-set:
+  ///   { courseId, lessonId, userId, userName, body, parentId, createdAt }.
+  Future<void> createDiscussion({
+    required String courseId,
+    required String lessonId,
+    required String uid,
+    required String userName,
+    required String body,
+    required String? parentId,
+  }) async {
+    final trimmed = body.trim();
+    final clampedBody =
+        trimmed.length > 2000 ? trimmed.substring(0, 2000) : trimmed;
+    final clampedName =
+        userName.length > 100 ? userName.substring(0, 100) : userName;
+    await _db.collection('discussions').add({
+      'courseId': courseId,
+      'lessonId': lessonId,
+      'userId': uid,
+      'userName': clampedName,
+      'body': clampedBody,
+      'parentId': parentId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Delete a discussion post (author or admin per rules; gate the button with
+  /// canDelete). Clients NEVER update discussion docs (`allow update: if false`).
+  Future<void> deleteDiscussion(String id) async {
+    await _db.collection('discussions').doc(id).delete();
   }
 
   /// Resolves a Firebase Storage path (e.g. thumbPath) to a download URL.

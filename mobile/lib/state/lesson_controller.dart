@@ -71,6 +71,15 @@ class LessonController extends ChangeNotifier {
 
   int get enrollmentPct => (_enrollment?.progressPct ?? 0).round();
 
+  /// The id of the module that owns the current lesson (needed to give the AI
+  /// tutor lesson-level grounding context), or null if not resolved.
+  String? get currentModuleId {
+    for (final m in _modules) {
+      if (lessonsFor(m.id).any((l) => l.id == lessonId)) return m.id;
+    }
+    return null;
+  }
+
   /// The id of the lesson after the current one (flattened order), or null.
   String? get nextLessonId {
     final flat = allLessons;

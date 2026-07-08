@@ -1,5 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../models/tutor.dart';
+
 /// A friendly, code-tagged error surfaced from a callable Cloud Function.
 /// Mirrors how the web maps `FirebaseFunctionsException.code` to messages.
 class CallableException implements Exception {
@@ -171,6 +173,47 @@ class CallableService {
     );
     return GenerateFlashcardsResult(
       count: ((data['count'] ?? 0) as num).toInt(),
+    );
+  }
+
+  // ── askTutor ─────────────────────────────────────────────────────────────────
+  /// AI tutor grounded in course content. Region `us-central1`, client timeout
+  /// 120s (matches the web — long answers exceed the 70s callable default).
+  ///
+  /// [history] is the last conversation turns as they stood BEFORE this
+  /// question; the client trims to the most recent 8 (server re-fences it as
+  /// untrusted). [conversationId] is only passed when tutorEnhancements is on
+  /// (append to an existing conversation). Errors are mapped by [_friendly]:
+  /// `resource-exhausted` → the friendly rate-limit line, `invalid-argument`
+  /// (empty/oversize question) and `internal` ("could not produce an answer")
+  /// surface their server message inline.
+  Future<AskTutorResult> askTutor({
+    required String courseId,
+    String? moduleId,
+    String? lessonId,
+    required String question,
+    List<TutorTurn> history = const [],
+    String? conversationId,
+  }) async {
+    // Trim to the last 8 turns (contract: history ≤ 8).
+    final trimmed =
+        history.length > 8 ? history.sublist(history.length - 8) : history;
+    final data = await _call(
+      'askTutor',
+      {
+        'courseId': courseId,
+        if (moduleId != null) 'moduleId': moduleId,
+        if (lessonId != null) 'lessonId': lessonId,
+        'question': question,
+        if (trimmed.isNotEmpty)
+          'history': trimmed.map((t) => t.toHistoryMap()).toList(),
+        if (conversationId != null) 'conversationId': conversationId,
+      },
+      timeout: const Duration(milliseconds: 120000),
+    );
+    return AskTutorResult(
+      answer: (data['answer'] ?? '') as String,
+      conversationId: (data['conversationId'] ?? '') as String,
     );
   }
 

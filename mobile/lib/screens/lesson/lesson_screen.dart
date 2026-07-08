@@ -20,6 +20,8 @@ import '../../widgets/lesson/external_video.dart';
 import '../../widgets/lesson/lesson_feedback.dart';
 import '../../widgets/lesson/storage_video.dart';
 import '../../widgets/lesson/text_lesson.dart';
+import '../../widgets/lesson/tutor_panel.dart';
+import '../../widgets/lesson/discussion_panel.dart';
 
 /// Lesson viewer — mirrors
 /// `src/app/learn/course/[courseId]/lesson/[lessonId]/page.tsx`.
@@ -126,12 +128,27 @@ class _LessonScreenState extends State<LessonScreen> {
                 color: AppColors.primary)),
         const SizedBox(height: 16),
         ..._lessonBody(lesson),
-        const SizedBox(height: 32),
+        const SizedBox(height: 24),
+        // AI tutor (7A) — base chat always available; persistence + thumbs are
+        // gated behind tutorEnhancements inside the panel.
+        TutorPanel(
+          courseId: widget.courseId,
+          uid: uid,
+          moduleId: _c.currentModuleId,
+          lessonId: widget.lessonId,
+        ),
+        const SizedBox(height: 16),
         LessonFeedback(
           firestore: context.read<FirestoreService>(),
           uid: uid,
           lessonId: widget.lessonId,
           courseId: widget.courseId,
+        ),
+        const SizedBox(height: 16),
+        // Per-lesson discussions (7C) — always on, below the tutor/feedback.
+        DiscussionPanel(
+          courseId: widget.courseId,
+          lessonId: widget.lessonId,
         ),
       ],
     );

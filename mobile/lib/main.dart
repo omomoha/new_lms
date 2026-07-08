@@ -7,6 +7,7 @@ import 'firebase_options.dart';
 import 'router/app_router.dart';
 import 'services/app_check.dart';
 import 'services/callable_service.dart';
+import 'services/feature_flags_service.dart';
 import 'services/file_service.dart';
 import 'services/firestore_service.dart';
 import 'services/video_service.dart';
@@ -48,6 +49,10 @@ class AndelaLmsApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthController()),
         Provider(create: (_) => FirestoreService()),
         Provider(create: (_) => CallableService()),
+        // Shared feature-flag service: reads settings/features once, cached in
+        // memory (default-off). Used by the tutor panel (tutorEnhancements) and
+        // the future forum entry (communityForum).
+        Provider(create: (_) => FeatureFlagsService()),
         Provider(create: (_) => FileService()),
         // Single VideoService instance so the in-memory signed-URL cache is
         // shared across lesson screens.
