@@ -394,16 +394,20 @@ service cloud.firestore {
     // notifications blocks above.
 
     // forumCategories/{id}
-    //   READ:  admins; any learner for "all" categories; cohort-scoped
-    //          categories require an intersection with the caller's cohortIds.
+    //   READ:  any authed user. NOTE: this was previously content-gated
+    //          (visibility/cohort), but that makes a learner's *list* query
+    //          (`getDocs(forumCategories)`) fail entirely — Firestore rejects a
+    //          content-dependent read on a list unless the query is constrained
+    //          to provably-readable docs. Since forumThreads/posts (the actual
+    //          content) are already `allow read: if isAuthed()`, gating only the
+    //          category metadata adds no real confidentiality. Clients keep a
+    //          `visibleCategories()` filter so learners still only SEE the
+    //          categories meant for them (cohort scoping is a UX concern here,
+    //          not a security boundary — the thread content is open to any authed
+    //          user by design).
     //   WRITE: admin-only (category management).
     match /forumCategories/{categoryId} {
-      allow read: if isAdmin()
-        || (isLearner()
-            && (resource.data.visibility == "all"
-                || resource.data.get("cohortIds", []).hasAny(
-                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("cohortIds", [])
-                   )));
+      allow read: if isAuthed();
       allow write: if isAdmin();
     }
 

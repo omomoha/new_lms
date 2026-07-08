@@ -164,6 +164,29 @@ beforeAll(async () => {
       parentId: null,
       createdAt: new Date(),
     });
+    // A second post dedicated to the delete test, so it never depends on a post
+    // created by an earlier test in the same run.
+    await setDoc(doc(db, "forumThreads", "thread-open", "posts", "post-deletable"), {
+      authorId: "learner-uid",
+      authorName: "Ada",
+      body: "delete me",
+      parentId: null,
+      createdAt: new Date(),
+    });
+    // A dedicated unlocked thread for the admin pin/lock test, so that test
+    // never mutates thread-open (which other tests rely on staying unlocked).
+    await setDoc(doc(db, "forumThreads", "thread-pinnable"), {
+      categoryId: "cat-all",
+      authorId: "other-uid",
+      authorName: "Grace",
+      title: "Pin me",
+      body: "Admin will pin/lock this",
+      pinned: false,
+      locked: false,
+      replyCount: 0,
+      createdAt: new Date(),
+      lastReplyAt: new Date(),
+    });
     // settings/features flag doc (any authed user may read it).
     await setDoc(doc(db, "settings", "features"), {
       communityForum: true,
@@ -666,18 +689,17 @@ describe("forum threads", () => {
   });
 
   it("allows an admin to pin/lock a thread", async () => {
-    const admin = testEnv.authenticatedContext("admin-uid", { role: "admin" });
+    // Grab the Firestore instance ONCE — calling context.firestore() a second
+    // time re-runs connectFirestoreEmulator and throws "Firestore has already
+    // been started". Operate on a dedicated thread so thread-open stays
+    // unlocked for the reply test.
+    const db = testEnv.authenticatedContext("admin-uid", { role: "admin" }).firestore();
     await assertSucceeds(
-      updateDoc(doc(admin.firestore(), "forumThreads", "thread-open"), {
+      updateDoc(doc(db, "forumThreads", "thread-pinnable"), {
         pinned: true,
         locked: true,
       })
     );
-    // restore for other tests (so the lock test below still sees it unlocked)
-    await updateDoc(doc(admin.firestore(), "forumThreads", "thread-open"), {
-      pinned: false,
-      locked: false,
-    });
   });
 });
 
@@ -747,9 +769,10 @@ describe("forum posts", () => {
 
   it("allows the author to delete their own post", async () => {
     const learner = testEnv.authenticatedContext("learner-uid", { role: "learner" });
+    // Delete the dedicated pre-seeded post (not one created by another test).
     await assertSucceeds(
       deleteDoc(
-        doc(learner.firestore(), "forumThreads", "thread-open", "posts", "post-new")
+        doc(learner.firestore(), "forumThreads", "thread-open", "posts", "post-deletable")
       )
     );
   });
@@ -799,14 +822,12 @@ describe("forum reports", () => {
   });
 
   it("allows an admin to read and resolve a report", async () => {
-    const admin = testEnv.authenticatedContext("admin-uid", { role: "admin" });
+    // Grab the Firestore instance ONCE (a second context.firestore() call
+    // throws "Firestore has already been started").
+    const db = testEnv.authenticatedContext("admin-uid", { role: "admin" }).firestore();
+    await assertSucceeds(getDoc(doc(db, "forumReports", "report-1")));
     await assertSucceeds(
-      getDoc(doc(admin.firestore(), "forumReports", "report-1"))
-    );
-    await assertSucceeds(
-      updateDoc(doc(admin.firestore(), "forumReports", "report-1"), {
-        resolved: true,
-      })
+      updateDoc(doc(db, "forumReports", "report-1"), { resolved: true })
     );
   });
 });
