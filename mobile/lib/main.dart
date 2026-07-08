@@ -6,7 +6,10 @@ import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'router/app_router.dart';
 import 'services/app_check.dart';
+import 'services/callable_service.dart';
+import 'services/file_service.dart';
 import 'services/firestore_service.dart';
+import 'services/video_service.dart';
 import 'state/auth_controller.dart';
 import 'theme/app_theme.dart';
 
@@ -44,6 +47,11 @@ class AndelaLmsApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthController()),
         Provider(create: (_) => FirestoreService()),
+        Provider(create: (_) => CallableService()),
+        Provider(create: (_) => FileService()),
+        // Single VideoService instance so the in-memory signed-URL cache is
+        // shared across lesson screens.
+        Provider<VideoService>(create: (_) => SignedUrlVideoService()),
       ],
       child: Builder(
         builder: (context) {

@@ -17,9 +17,9 @@ class ProfileScreen extends StatelessWidget {
         ? name.trim().split(' ').map((w) => w[0]).take(2).join().toUpperCase()
         : '?';
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
-      body: ListView(
+    // Body-only: the bottom-nav shell owns the AppBar. Full profile forms
+    // (name/password/cohorts) arrive in Phase 5.
+    return ListView(
         padding: const EdgeInsets.all(16),
         children: [
           const SizedBox(height: 8),
@@ -70,7 +70,6 @@ class ProfileScreen extends StatelessWidget {
             label: const Text('Sign out'),
           ),
         ],
-      ),
     );
   }
 

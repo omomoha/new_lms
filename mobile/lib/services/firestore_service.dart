@@ -11,6 +11,8 @@ import '../models/attempt.dart';
 import '../models/certificate.dart';
 import '../models/flashcard.dart';
 import '../models/cohort.dart';
+import '../models/assessment.dart';
+import '../models/lesson_feedback.dart';
 
 /// All learner-facing Firestore reads/writes, matching the query patterns in
 /// the web portal (src/app/learn/*).
@@ -70,6 +72,30 @@ class FirestoreService {
       });
 
     return result;
+  }
+
+  /// All published courses (rules allow learners to read any published doc).
+  /// Single-field `where(status==published)` query.
+  Future<List<Course>> getPublishedCourses() async {
+    final snap = await _db
+        .collection('courses')
+        .where('status', isEqualTo: 'published')
+        .get();
+    return snap.docs.map(Course.fromDoc).toList();
+  }
+
+  /// Fresh cohort membership from users/{uid}.cohortIds. Fail-soft: returns
+  /// [fallback] (the cached value) on any read error.
+  Future<List<String>> getUserCohortIds(String uid,
+      {List<String> fallback = const []}) async {
+    try {
+      final me = await _db.collection('users').doc(uid).get();
+      final fresh = me.data()?['cohortIds'];
+      if (fresh is List) return List<String>.from(fresh);
+    } catch (_) {
+      // Keep cached membership on failure.
+    }
+    return fallback;
   }
 
   Future<Course?> getCourse(String courseId) async {
@@ -137,6 +163,17 @@ class FirestoreService {
         .toList();
   }
 
+  /// The learner's enrollment for one course, by doc id (rules allow read of
+  /// own enrollment by the `{uid}_{courseId}` prefix). Null when not enrolled.
+  Future<Enrollment?> getEnrollment(String uid, String courseId) async {
+    final snap = await _db
+        .collection('enrollments')
+        .doc(Enrollment.docId(uid, courseId))
+        .get();
+    if (!snap.exists) return null;
+    return Enrollment.fromDoc(snap);
+  }
+
   /// All of the learner's enrollments — single-field `where(userId==uid)`.
   Future<List<Enrollment>> getUserEnrollments(String uid) async {
     final snap = await _db
@@ -184,6 +221,94 @@ class FirestoreService {
     return Certificate.fromDoc(snap);
   }
 
+  /// All assessments for a course — SINGLE-FIELD `where(courseId==id)` query.
+  /// Callers filter by `kind` (pre/post/quiz) and `lessonId` client-side to
+  /// avoid composite indexes. Questions only — never any answer keys.
+  Future<List<Assessment>> getCourseAssessments(String courseId) async {
+    final snap = await _db
+        .collection('assessments')
+        .where('courseId', isEqualTo: courseId)
+        .get();
+    return snap.docs.map(Assessment.fromDoc).toList();
+  }
+
+  /// Read the learner's own lessonFeedback/{uid}_{lessonId} doc (prefill).
+  /// Fail-soft: returns null on any error (feedback must never break a lesson).
+  Future<LessonFeedback?> getLessonFeedback(String uid, String lessonId) async {
+    try {
+      final snap = await _db
+          .collection('lessonFeedback')
+          .doc(LessonFeedback.docId(uid, lessonId))
+          .get();
+      if (!snap.exists) return null;
+      return LessonFeedback.fromDoc(snap);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Write the learner's lessonFeedback/{uid}_{lessonId} doc. Only the fields
+  /// firestore.rules validates are written (userId, rating 1-5 int, comment
+  /// <=1000). `courseId` is written for admin analytics parity with the web.
+  Future<void> saveLessonFeedback({
+    required String uid,
+    required String lessonId,
+    required String courseId,
+    required int rating,
+    required String comment,
+  }) async {
+    final trimmed = comment.trim();
+    final clampedComment =
+        trimmed.length > 1000 ? trimmed.substring(0, 1000) : trimmed;
+    await _db
+        .collection('lessonFeedback')
+        .doc(LessonFeedback.docId(uid, lessonId))
+        .set({
+      'userId': uid,
+      'lessonId': lessonId,
+      'courseId': courseId,
+      'rating': rating,
+      'comment': clampedComment,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Throttled video-progress save (mirrors the web VideoPlayer.saveProgress).
+  /// Writes {watchedPct, positionSec, completedAt:null} with merge. NEVER call
+  /// this once a lesson is completed — the caller guards with a completedRef so
+  /// completedAt is not clobbered back to null.
+  Future<void> saveVideoProgress({
+    required String uid,
+    required String courseId,
+    required String lessonId,
+    required int positionSec,
+    required int watchedPct,
+  }) async {
+    final progRef =
+        _db.collection('progress').doc(LessonProgress.docId(uid, lessonId));
+    await progRef.set(
+      {
+        'userId': uid,
+        'lessonId': lessonId,
+        'courseId': courseId,
+        'watchedPct': watchedPct,
+        'positionSec': positionSec,
+        'completedAt': null,
+      },
+      SetOptions(merge: true),
+    );
+    // Keep the enrollment's lastLessonId fresh during playback (merge).
+    final enrollRef =
+        _db.collection('enrollments').doc(Enrollment.docId(uid, courseId));
+    await enrollRef.set(
+      {
+        'lastLessonId': lessonId,
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+  }
+
   /// Fetch a learner's member cohort docs (fail-soft — a denied/missing cohort
   /// is skipped rather than throwing). Used for courseDueDates.
   Future<List<Cohort>> getMemberCohorts(List<String> cohortIds) async {
@@ -218,6 +343,9 @@ class FirestoreService {
         'lessonId': lessonId,
         'courseId': courseId,
         'watchedPct': 100,
+        // LOW-1 (Phase 1 QA): write positionSec:0 for exact web doc-shape
+        // parity — the web's mark-complete set() writes positionSec: 0.
+        'positionSec': 0,
         'completedAt': FieldValue.serverTimestamp(),
       },
       SetOptions(merge: true),

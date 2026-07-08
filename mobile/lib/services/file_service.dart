@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:firebase_storage/firebase_storage.dart';
 
 import '../logic/video_embed.dart';
@@ -59,6 +61,26 @@ class FileService {
   /// Convert a storage path (Lesson.filePath) into a download URL.
   Future<String> resourceUrl(String storagePath) =>
       _storage.ref(storagePath).getDownloadURL();
+
+  /// Download the raw bytes of a storage object (used to render PDFs inline
+  /// with pdfx and to fetch md/txt content). Max 50 MB. Null on failure.
+  Future<Uint8List?> resourceBytes(String storagePath) async {
+    try {
+      return await _storage.ref(storagePath).getData(50 * 1024 * 1024);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Bytes of the server-converted PDF twin at `${filePath}.pdf`, or null when
+  /// no twin exists yet.
+  Future<Uint8List?> officePdfTwinBytes(String filePath) async {
+    try {
+      return await _storage.ref('$filePath.pdf').getData(50 * 1024 * 1024);
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Try the server-converted PDF twin at `${filePath}.pdf` (written by the
   /// convertOfficeToPdf Storage trigger for pptx/ppt/doc). Returns null when
