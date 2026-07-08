@@ -3,19 +3,33 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import NotificationsBell from "@/components/notifications/NotificationsBell";
 import ThemeToggle from "@/components/ui/ThemeToggle";
+import { getFeatureFlag } from "@/lib/featureFlags";
 
 export default function LearnerShell({ children }: { children: React.ReactNode }) {
   const { user, appUser, loading, signOut } = useAuth();
   const router = useRouter();
+  // Feature-flag the Forum nav link: with settings/features absent (prod
+  // default) the link stays hidden, so the learner nav is EXACTLY pre-Phase-4.
+  const [forumOn, setForumOn] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
       router.replace("/auth/login");
     }
   }, [user, loading, router]);
+
+  useEffect(() => {
+    let alive = true;
+    void getFeatureFlag("communityForum").then((on) => {
+      if (alive) setForumOn(on);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   if (loading || !user) return null;
 
@@ -28,6 +42,14 @@ export default function LearnerShell({ children }: { children: React.ReactNode }
         <div className="flex items-center gap-3">
           <ThemeToggle />
           {user && <NotificationsBell uid={user.uid} />}
+          {forumOn && (
+            <Link
+              href="/learn/forum"
+              className="text-xs text-white/70 hover:text-white transition-colors"
+            >
+              Forum
+            </Link>
+          )}
           <Link
             href="/learn/achievements"
             className="text-xs text-white/70 hover:text-white transition-colors"

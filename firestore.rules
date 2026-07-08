@@ -76,6 +76,16 @@ service cloud.firestore {
             && request.resource.data.name.size() >= 2
             && request.resource.data.name.size() <= 100);
       allow delete: if isAdmin();
+
+      // ── users/{uid}/tutorConversations/{id} ──────────────────────────────
+      // Phase 4 (Workstream A). AI-tutor chat threads. Learner-private: the
+      // owner reads their own; admins read all for quality review. WRITES are
+      // server-side only (the askTutor callable persists turns via the admin
+      // SDK) so transcripts can't be forged from the client.
+      match /tutorConversations/{conversationId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if false; // askTutor function only via admin SDK
+      }
     }
 
     // ── cohorts/{id} ────────────────────────────────────────────────────────
@@ -108,6 +118,11 @@ service cloud.firestore {
 
         // Fix #14: lessons subcollection — enforce same cohort-assignment check
         // as the course-level rule (not just published status).
+        // Phase 4 (Workstream C): the Mux fields (muxUploadId/muxAssetId/
+        // muxPlaybackId/muxStatus, and the "mux:" videoPath rewrite) are written
+        // ONLY by the muxWebhook / backfillVideosToMux functions via the admin
+        // SDK (which bypasses rules) or by an admin in the builder — clients can
+        // never forge them, since lesson writes stay admin-only here.
         match /lessons/{lessonId} {
           allow read: if isAdmin() || (isLearner() && canAccessCourse(courseId));
           allow write: if isAdmin();
@@ -185,6 +200,23 @@ service cloud.firestore {
         && request.resource.data.rating <= 5
         && request.resource.data.comment is string
         && request.resource.data.comment.size() <= 1000;
+    }
+
+    // ── tutorFeedback/{uid_conversationId_turnIndex} ────────────────────────
+    // Phase 4 (Workstream A). Thumbs up/down (+ optional reason) on a tutor
+    // answer. The learner creates/overwrites their OWN feedback; admins read
+    // everything for quality analytics. Doc-ID prefix must be the caller's uid.
+    match /tutorFeedback/{feedbackId} {
+      allow read: if isAdmin()
+        || (isAuthed()
+            && (feedbackId.matches(request.auth.uid + "_.+")
+                || resource.data.userId == request.auth.uid));
+      allow write: if isAuthed()
+        && feedbackId.matches(request.auth.uid + "_.+")
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.rating in ["up", "down"]
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() <= 1000;
     }
 
     // ── labGrades/{uid_lessonId} ────────────────────────────────────────────
@@ -337,8 +369,145 @@ service cloud.firestore {
     // Phase 3. Global app settings (e.g. settings/certificate holds the
     // default certificate template). Admin-managed; functions read via
     // admin SDK.
+    //
+    // EXCEPTION: settings/features (the feature-flag doc) is READABLE by any
+    // authenticated user — the client gates UI on it. Writes stay admin-only.
     match /settings/{settingId} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin()
+        || (settingId == "features" && isAuthed());
+      allow write: if isAdmin();
+    }
+
+    // ── analytics/{id} (Phase 4 — Workstream D) ─────────────────────────────
+    // Pre-aggregated leadership metrics (analytics/overview,
+    // analytics/course_{id}, analytics/cohort_{id}). Written ONLY by the
+    // analyticsAggregation scheduled function via the admin SDK; readable by
+    // admins only (the dashboard is admin-gated). No client writes — metrics
+    // must never be forgeable.
+    match /analytics/{docId} {
+      allow read: if isAdmin();
+      allow write: if false; // analyticsAggregation function only via admin SDK
+    }
+
+    // ── Community Forum (Phase 4 — Workstream B) ─────────────────────────────
+    // Standalone cross-cohort discussion space. Modeled on the discussions +
+    // notifications blocks above.
+
+    // forumCategories/{id}
+    //   READ:  admins; any learner for "all" categories; cohort-scoped
+    //          categories require an intersection with the caller's cohortIds.
+    //   WRITE: admin-only (category management).
+    match /forumCategories/{categoryId} {
+      allow read: if isAdmin()
+        || (isLearner()
+            && (resource.data.visibility == "all"
+                || resource.data.get("cohortIds", []).hasAny(
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("cohortIds", [])
+                   )));
+      allow write: if isAdmin();
+    }
+
+    // forumThreads/{id}
+    //   READ:   any authed user (category visibility is enforced in the UI/query;
+    //           thread bodies carry no cohort secrets and are deliberately
+    //           cross-cohort). Admins included.
+    //   CREATE: any authed user, authored as themselves, with a fixed initial
+    //           shape (pinned/locked false, replyCount 0). Title/body bounded.
+    //   UPDATE: author may edit ONLY title/body/editedAt; an admin may change
+    //           anything (pin/lock/moderation). Reply-count/lastReplyAt bumps
+    //           come from the reply write path or the admin SDK.
+    //   DELETE: author or admin.
+    function threadAuthorEditKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(["title", "body", "editedAt"]);
+    }
+    match /forumThreads/{threadId} {
+      allow read: if isAuthed();
+      allow create: if isAuthed()
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.categoryId is string
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 1
+        && request.resource.data.title.size() <= 200
+        && request.resource.data.body is string
+        && request.resource.data.body.size() >= 1
+        && request.resource.data.body.size() <= 5000
+        && request.resource.data.authorName is string
+        && request.resource.data.authorName.size() <= 100
+        && request.resource.data.pinned == false
+        && request.resource.data.locked == false
+        && request.resource.data.replyCount == 0;
+      allow update: if isAdmin()
+        || (isAuthed()
+            && resource.data.authorId == request.auth.uid
+            && threadAuthorEditKeys()
+            && request.resource.data.title.size() >= 1
+            && request.resource.data.title.size() <= 200
+            && request.resource.data.body.size() >= 1
+            && request.resource.data.body.size() <= 5000);
+      allow delete: if isAdmin()
+        || (isAuthed() && resource.data.authorId == request.auth.uid);
+
+      // forumThreads/{id}/posts/{postId} — replies within a thread.
+      //   READ:   any authed user.
+      //   CREATE: any authed user, authored as themselves, ONLY when the parent
+      //           thread is NOT locked — lock enforcement lives AT THE RULES
+      //           LAYER (get() resolves the thread doc).
+      //   UPDATE: author may edit ONLY body/editedAt; any authed user may toggle
+      //           ONLY their own reaction (reactions map); admins may edit
+      //           anything (moderation).
+      //   DELETE: author or admin.
+      match /posts/{postId} {
+        function parentThread() {
+          return get(/databases/$(database)/documents/forumThreads/$(threadId)).data;
+        }
+        function postAuthorEditKeys() {
+          return request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["body", "editedAt"]);
+        }
+        function reactionOnlyChange() {
+          return request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["reactions"]);
+        }
+        allow read: if isAuthed();
+        allow create: if isAuthed()
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.body is string
+          && request.resource.data.body.size() >= 1
+          && request.resource.data.body.size() <= 5000
+          && request.resource.data.authorName is string
+          && request.resource.data.authorName.size() <= 100
+          && (request.resource.data.parentId == null
+              || request.resource.data.parentId is string)
+          && parentThread().locked == false;
+        allow update: if isAdmin()
+          || (isAuthed()
+              && resource.data.authorId == request.auth.uid
+              && postAuthorEditKeys()
+              && request.resource.data.body.size() >= 1
+              && request.resource.data.body.size() <= 5000)
+          || (isAuthed() && reactionOnlyChange());
+        allow delete: if isAdmin()
+          || (isAuthed() && resource.data.authorId == request.auth.uid);
+      }
+    }
+
+    // forumReports/{id} — user reports for moderator review.
+    //   CREATE: any authed user, attributed to themselves, unresolved.
+    //   READ:   admins (the moderation queue) or the reporter (their own).
+    //   UPDATE: admins only (mark resolved). No deletes.
+    match /forumReports/{reportId} {
+      allow read: if isAdmin()
+        || (isAuthed() && resource.data.reporterId == request.auth.uid);
+      allow create: if isAuthed()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.threadId is string
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 1
+        && request.resource.data.reason.size() <= 1000
+        && request.resource.data.resolved == false;
+      allow update: if isAdmin();
+      allow delete: if false;
     }
   }
 }

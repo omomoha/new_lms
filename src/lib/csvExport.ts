@@ -60,6 +60,112 @@ export function toCsv(
   return CSV_BOM + lines.join("\r\n") + "\r\n";
 }
 
+// ─── Analytics dataset builders (Phase 4 — Workstream D) ──────────────────────
+// Pure {headers, rows} builders for the analytics dashboard exports. Browser-
+// safe (no firebase). Numbers are app-computed so they serialise verbatim; only
+// the string fields (titles, names) go through the formula-injection guard in
+// sanitizeCsvField. Unit-tested in tests/csvExport.test.ts.
+
+export interface CsvTable {
+  headers: string[];
+  rows: CsvField[][];
+}
+
+/** Minimal shapes — kept local so this module stays firebase-free. */
+interface CourseRow {
+  title: string;
+  enrolled: number;
+  started: number;
+  completed: number;
+  completionPct: number;
+  avgProgress: number;
+  quizPassRate: number;
+  quizAttempts: number;
+}
+interface CohortRow {
+  name: string;
+  enrolled: number;
+  completed: number;
+  completionPct: number;
+  avgProgress: number;
+  dau: number;
+  wau: number;
+  atRiskCount: number;
+}
+interface AtRiskRow {
+  userId: string;
+  courseTitle: string;
+  cohortName: string | null;
+  progressPct: number;
+  reasons: string[];
+}
+
+/** Per-course completion + quiz table. */
+export function buildCourseAnalyticsCsv(courses: CourseRow[]): CsvTable {
+  return {
+    headers: [
+      "Course",
+      "Enrolled",
+      "Started",
+      "Completed",
+      "Completion %",
+      "Avg progress %",
+      "Quiz pass rate %",
+      "Quiz attempts",
+    ],
+    rows: courses.map((c) => [
+      c.title,
+      c.enrolled,
+      c.started,
+      c.completed,
+      c.completionPct,
+      c.avgProgress,
+      c.quizPassRate,
+      c.quizAttempts,
+    ]),
+  };
+}
+
+/** Per-cohort comparison table. */
+export function buildCohortAnalyticsCsv(cohorts: CohortRow[]): CsvTable {
+  return {
+    headers: [
+      "Cohort",
+      "Enrolled",
+      "Completed",
+      "Completion %",
+      "Avg progress %",
+      "DAU",
+      "WAU",
+      "At-risk learners",
+    ],
+    rows: cohorts.map((c) => [
+      c.name,
+      c.enrolled,
+      c.completed,
+      c.completionPct,
+      c.avgProgress,
+      c.dau,
+      c.wau,
+      c.atRiskCount,
+    ]),
+  };
+}
+
+/** At-risk learners table — reasons joined with a semicolon. */
+export function buildAtRiskCsv(learners: AtRiskRow[]): CsvTable {
+  return {
+    headers: ["Learner UID", "Course", "Cohort", "Progress %", "Reasons"],
+    rows: learners.map((l) => [
+      l.userId,
+      l.courseTitle,
+      l.cohortName ?? "—",
+      l.progressPct,
+      l.reasons.join("; "),
+    ]),
+  };
+}
+
 /**
  * Trigger a client-side download of a CSV string via a Blob + anchor click.
  * No-op outside the browser (SSR-safe).
