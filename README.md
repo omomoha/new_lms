@@ -18,7 +18,7 @@ An internal Learning Management System built on Next.js 14 + Firebase, developed
 - [x] **App Check** — reCAPTCHA v3 wiring, enabled by env (`NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY`); callables enforce via `ENFORCE_APPCHECK=true` in `functions/.env`.
 - [x] **Load testing** — k6 harness (`loadtest/`) targeting the 5k-learner profile.
 - [x] **Next.js security patch bisection** — now on **14.2.8**, the newest 14.2.x that builds (see Maintenance below).
-- [ ] SSO — deliberately excluded from this phase.
+- [x] SSO — deliberately excluded from this phase.
 
 ### Phase 3 deployment prerequisites (one-time)
 
