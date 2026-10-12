@@ -55,7 +55,7 @@ export default function ForumHome() {
 
   return (
     <LearnerShell>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+      <div className="w-4/5 mx-auto px-2.5 py-6">
         <div className="page-hero mb-6">
           <span className="kicker">COMMUNITY</span>
           <h1 className="font-serif-brand text-2xl sm:text-3xl font-normal text-white leading-tight">
