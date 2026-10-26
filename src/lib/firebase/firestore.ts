@@ -1,5 +1,6 @@
 import {
   initializeFirestore,
+  connectFirestoreEmulator,
   persistentLocalCache,
   persistentMultipleTabManager,
 } from "firebase/firestore";
@@ -22,4 +23,10 @@ const db = initializeFirestore(app, {
     tabManager: persistentMultipleTabManager(),
   }),
 });
+
+const emulatorHost = process.env.NEXT_PUBLIC_FIREBASE_EMULATOR_HOST;
+if (typeof window !== "undefined" && emulatorHost) {
+  connectFirestoreEmulator(db, emulatorHost, 8080);
+}
+
 export default db;

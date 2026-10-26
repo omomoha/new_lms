@@ -122,9 +122,30 @@ npm run dev
 
 ### 4. Run against Firebase Emulators (recommended for local dev)
 
+To keep local testing separate from the live Firebase project, set
+`NEXT_PUBLIC_FIREBASE_EMULATOR_HOST=127.0.0.1` in `.env.local` and use the
+matching demo project ID in both the app config and emulator command. For example:
+
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=demo-api-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=demo-andela-lms.local
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-andela-lms
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=demo-andela-lms.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=000000000000
+NEXT_PUBLIC_FIREBASE_APP_ID=1:000000000000:web:000000000000000000000000
+NEXT_PUBLIC_FIREBASE_EMULATOR_HOST=127.0.0.1
+```
+
+The host setting makes the client SDK connect Auth, Firestore, Functions, and
+Storage to their local emulator ports. It must remain unset when using a live
+Firebase project.
+
 ```bash
-# Start all emulators
-firebase emulators:start
+# Build the Cloud Functions first so the Functions emulator can load them
+npm --prefix functions run build
+
+# Start the local services (no live Firebase project required)
+firebase emulators:start --only auth,functions,firestore,storage --project demo-andela-lms
 
 # In a separate terminal
 npm run dev
